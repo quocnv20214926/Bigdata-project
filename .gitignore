@@ -1,0 +1,25 @@
+# Data (không commit dữ liệu thô)
+data/*
+!data/.gitkeep
+*.csv
+*.csv.gz
+*.parquet
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Spark / Kafka / checkpoint
+spark-warehouse/
+checkpoints/
+metastore_db/
+derby.log
+
+# Env & IDE
+.env
+.vscode/
+.idea/
+.DS_Store
