@@ -105,20 +105,20 @@ System monitoring uses Grafana and Kafka UI rather than custom code.
 
 ## 6. Roadmap (10 Weeks)
 
-### Week 0: Project Setup
+### Week 1: Project Setup
 - [x] Create repository structure, README, and plan
 - [ ] Write `infra/docker-compose.yml`: MinIO, Kafka, Spark (1 master + 2 workers), Redis, Airflow
 - [ ] Download the dataset into `data/raw/`, verify columns and event types
 - [ ] Initialize the git repository
 - **Deliverable:** stack runs with `docker compose up`, report `docs/week-00.md`
 
-### Week 1: EDA & ETL
+### Week 2: EDA & ETL
 - EDA: event_type distribution, view→cart→purchase funnel, events per user, product long tail
 - Cleaning: drop duplicates, handle null `brand`/`category_code`, drop price ≤ 0, filter bots (> 1000 events/day), normalize to UTC
 - Write Parquet partitioned by `event_date` to MinIO; time-based train/test split
 - **Deliverable:** EDA notebook, ETL job, dataset statistics table
 
-### Weeks 2–3: Batch Layer
+### Weeks 3–4: Batch Layer
 - Weighted user–item interaction matrix; map IDs to integers
 - Baselines: Popularity, session co-occurrence Item-kNN
 - Implicit ALS: grid search over `rank` ∈ {32, 64, 128}, `regParam`, `alpha`
@@ -126,24 +126,24 @@ System monitoring uses Grafana and Kafka UI rather than custom code.
 - Bulk load into Redis via pipelines; Airflow DAG `nightly_batch`: ETL → train → similarity → load
 - **Deliverable:** ALS vs baselines comparison (NDCG@10, Recall@20, Precision@10, coverage)
 
-### Weeks 4–5: Speed Layer
+### Weeks 5–6: Speed Layer
 - Event Replayer: read Parquet in `event_time` order, publish to topic `events` (key = `user_id`), configurable replay speed
 - Structured Streaming: watermarking; `foreachBatch` updates `user:recent`, `rec:rt`, `user:bought`; 1h window sliding every 5 minutes for trending; checkpointing
 - **Deliverable:** demo where viewing product A changes recommendations within seconds
 
-### Week 6: Serving Layer & UI
+### Week 7: Serving Layer & UI
 - FastAPI with 3 endpoints; merge, filter, and fallback logic; Redis reads batched in a single round-trip
 - Load test at 500–1000 RPS, measure p50/p95/p99; target p95 < 100ms
 - 3-page Streamlit UI
 - **Deliverable:** API, latency report, demo UI
 
-### Week 7: Evaluation
+### Week 8: Evaluation
 - Experiment A: batch-only (ALS)
 - Experiment B: batch + speed. Replay the test set; at each cart/purchase event, take the recommendations just before it and measure Hit Rate@K, NDCG@K
 - Tune α and λ; break down results by user segment (new / light / heavy)
 - **Deliverable:** A/B comparison charts, ablation table
 
-### Weeks 8–9: Monitoring, Optimization & Report
+### Weeks 9-10: Monitoring, Optimization & Report
 - Grafana: Kafka consumer lag, streaming throughput, API latency, Redis memory
 - Spark tuning: partitioning, broadcast joins, caching; (optional) scale to the full 7 months of data
 - Final report: architecture, Lambda vs Kappa, results, limitations, future work (GRU4Rec/SASRec)

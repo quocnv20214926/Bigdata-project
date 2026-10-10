@@ -54,4 +54,4 @@ Raw data goes in `data/` (not committed to git).
 
 ## Status
 
-🚧 Week 0: project scaffolding.
+🚧 Week 1: project scaffolding.
