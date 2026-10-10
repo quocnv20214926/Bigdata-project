@@ -29,49 +29,102 @@ The project must also show with metrics that the speed layer improves recommenda
 
 ## 3. Architecture
 
+The system is built as **two independent pipelines** that both read the raw data and write to separate Redis keys. They meet only in the API.
+
 ```
-                ┌──────────────── BATCH LAYER (nightly, Airflow) ─────────────────┐
-REES46 CSV ──►  │ S3/MinIO (raw) → PySpark ETL → Parquet (clean, by date)         │
-   │            │   ├─ Implicit ALS → top-100 recommendations per user            │
-   │            │   ├─ Item-item similarity (ALS factors + session co-occurrence) │
-   │            │   └─ Category popularity                                        │
-   │            └──────────────────────────┬──────────────────────────────────────┘
-   │                                       ▼ (bulk load)
-   │                                  ┌─────────┐
-   ▼                                  │  REDIS  │◄──── Recommendation API (FastAPI)
-Event Replayer ─► Kafka ─► Spark      │ serving │      merge batch + real-time,
-(replays by event_time)   Structured ─►         │      filter, fallback → Streamlit UI
-                          Streaming   └─────────┘
-                ┌──────── SPEED LAYER ──────────────┐
-                │ • keep last N events per user     │
-                │ • propagate scores via sim(i, j)  │
-                │ • windowed trending               │
-                └───────────────────────────────────┘
+                ┌──────────────── BATCH PIPELINE (Pair 1, nightly, Airflow) ──────────┐
+           ┌──► │ S3/MinIO (raw) → PySpark ETL → Parquet (clean, by date)             │
+           │    │   ├─ Implicit ALS → rec:batch (top-100 per user)                    │
+           │    │   ├─ Item-item similarity on ALS factors → sim:item                 │
+           │    │   └─ Long-term popularity → pop:cat, pop:global                     │
+           │    └───────────────────────────────┬─────────────────────────────────────┘
+REES46 CSV │                                    ▼ (bulk load)
+           │                               ┌─────────┐
+           │                               │  REDIS  │◄──── Recommendation API (FastAPI)
+           │                               │ serving │      merge batch + real-time,
+           │                               └─────────┘      filter, fallback → Streamlit UI
+           │                                    ▲
+           │    ┌──────────────── REAL-TIME PIPELINE (Pair 2) ───────────────────────┐
+           └──► │ Event Replayer (raw CSV, by event_time) → Kafka → Structured       │
+                │ Streaming:                                                          │
+                │   • user:recent, user:bought                                        │
+                │   • session co-occurrence → sim:cooc                                │
+                │   • score propagation with time decay → rec:rt                      │
+                │   • 1h windowed counts → trend:cat, trend:global                    │
+                └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 3.1. Redis Key Design
 
-| Key | Type | Source | TTL |
-|---|---|---|---|
-| `rec:batch:{user_id}` | ZSET (product → score) | Batch | Overwritten nightly |
-| `sim:item:{product_id}` | ZSET of top-50 similar items | Batch | Overwritten nightly |
-| `pop:cat:{category_id}` | ZSET of trending items | Batch + Speed | ~1h |
-| `user:recent:{user_id}` | LIST of last 20 events | Speed | 24h |
-| `rec:rt:{user_id}` | ZSET of real-time scores | Speed | 2–6h |
-| `user:bought:{user_id}` | SET of purchased items | Speed | 30 days |
+Each key has exactly one writer pipeline. The authoritative definition is `common/redis_keys.py`.
 
-### 3.2. Scoring
+| Key | Type | Writer | TTL | Value |
+|---|---|---|---|---|
+| `rec:batch:{user_id}` | ZSET | Batch | Overwritten nightly | product → ALS score |
+| `sim:item:{product_id}` | ZSET | Batch | Overwritten nightly | top-50 product → cosine similarity |
+| `pop:cat:{category_id}`, `pop:global` | ZSET | Batch | Overwritten nightly | product → long-term popularity |
+| `meta:batch:last_run` | STRING | Batch | none | timestamp of last load |
+| `user:recent:{user_id}` | LIST | Speed | 24h | last 20 events, `product_id\|event_type\|epoch` |
+| `user:bought:{user_id}` | SET | Speed | 30 days | purchased products |
+| `rec:rt:{user_id}` | ZSET | Speed | 6h | product → real-time score |
+| `sim:cooc:{product_id}` | ZSET | Speed | 7 days | top-50 product → normalized co-occurrence |
+| `trend:cat:{category_id}`, `trend:global` | ZSET | Speed | 1h | product → weighted count in last hour |
 
-- **Event weights** (shared by batch and speed, defined in `common/weights.py`): view = 1, cart = 3, purchase = 5.
+### 3.2. Similarity
+
+| | `sim:cooc` (speed) | `sim:item` (batch) |
+|---|---|---|
+| Method | Count of products viewed in the same session (within the last 10 items), normalized: `cooc(i, j) / sqrt(cnt(i) · cnt(j))` | Cosine similarity between ALS item factors |
+| Update | Continuously, per event | Nightly |
+| Strength | Simple; captures new products and trends immediately | Learns latent relations between products never viewed together |
+| Weakness | Noisy for rarely viewed products; only direct relations | New products wait for the next training run |
+
+The speed layer uses `sim:cooc` by default, so it does not depend on the batch layer. After integration, `sim:item` is added and the three variants (cooc / item / hybrid) are compared.
+
+### 3.3. Scoring
+
+- **Event weights** (`common/weights.py`): view = 1, cart = 3, purchase = 5.
 - **Implicit ALS:** confidence = 1 + α · log(1 + total interaction score).
 - **Real-time score:** for an event of type *e* by a user on item *i*, occurring Δt ago:
-  `rt[j] += w_e · sim(i, j) · exp(−λ · Δt)` for every *j* in the top-K similar items of *i*.
-- **Final score:** `score = α · norm(batch) + (1 − α) · norm(rt)`. α and λ are tuned through offline evaluation.
-- **Post-processing:** remove already purchased items; users with no batch data fall back to `pop:cat` for the category they just viewed.
+  `rt[j] += w_e · sim(i, j) · exp(−λ · Δt)` for every *j* in the top-K similar items of *i*, with λ = ln 2 / half-life (default half-life 30 minutes).
+- **Final score:** `score = α · norm(batch) + (1 − α) · norm(rt)` with min-max normalization. α and the half-life are tuned through offline evaluation.
+- **Graceful degradation:** if `rec:batch` is missing, α = 0; if `rec:rt` is missing, α = 1. If both are missing, the API falls back to `trend:cat` of the last viewed category, then `pop:global`.
+- **Post-processing:** remove products in `user:bought`.
 
-### 3.3. Why Lambda Instead of Kappa
+All formulas are implemented once in `common/scoring.py` and reused by the streaming job, the API, and offline evaluation.
 
-ALS needs to train on the full history, which is a natural fit for batch processing. The speed layer only needs lightweight logic (score propagation, windowed counts). The trade-off is maintaining two codebases; the risk of logic drift is reduced by a shared module in `common/`.
+### 3.4. Shared Contracts (`common/`)
+
+The two pipelines communicate only through contracts in `common/`, frozen at the start of Week 1.
+
+| Module | Contract |
+|---|---|
+| `config.py` | Environment variables, service addresses, list sizes (top-N) |
+| `schemas.py` | Raw CSV columns, clean Parquet schema, Kafka message format (`Event`) |
+| `weights.py` | Event weights, ALS confidence formula |
+| `redis_keys.py` | Every Redis key, its type, writer, TTL, and value encoding |
+| `scoring.py` | Time decay, co-occurrence similarity, score propagation, score merging |
+| `models.py` | API response models (pydantic) |
+
+**Kafka contract:** topic `events`, key = `user_id`, value = JSON produced by `Event.to_json()` with `event_time` in ISO 8601 UTC.
+
+**Change rule:** any change to `common/` needs a PR approved by one member of each pair and a bump of `CONTRACT_VERSION`. See `common/README.md`.
+
+### 3.5. Infrastructure Layout
+
+Docker Compose is split so each pair owns its own services:
+
+| File | Services | Owner |
+|---|---|---|
+| `infra/compose.base.yml` | MinIO, Redis | Shared |
+| `infra/compose.batch.yml` | Spark master/workers, Airflow | Pair 1 |
+| `infra/compose.stream.yml` | Kafka, Kafka UI, streaming job, API, Streamlit, Prometheus, Grafana | Pair 2 |
+
+Run everything: `docker compose -f infra/compose.base.yml -f infra/compose.batch.yml -f infra/compose.stream.yml up`.
+
+### 3.6. Why Lambda Instead of Kappa
+
+ALS needs to train on the full history, which is a natural fit for batch processing. The speed layer only needs lightweight logic (co-occurrence counting, score propagation, windowed counts). The trade-off is maintaining two codebases; the risk of logic drift is reduced by the shared contracts in `common/`.
 
 ## 4. Tech Stack
 
@@ -103,63 +156,52 @@ ALS needs to train on the full history, which is a natural fit for batch process
 
 System monitoring uses Grafana and Kafka UI rather than custom code.
 
-## 6. Roadmap (10 Weeks)
+## 6. Roadmap
+
+The team works in 2 fixed pairs, each owning one pipeline. The detailed weekly assignment is in [assignment.md](assignment.md).
 
 ### Week 1: Project Setup
 - [x] Create repository structure, README, and plan
-- [ ] Write `infra/docker-compose.yml`: MinIO, Kafka, Spark (1 master + 2 workers), Redis, Airflow
+- [x] Draft shared contracts in `common/`
+- [ ] Write the three Docker Compose files in `infra/`
 - [ ] Download the dataset into `data/raw/`, verify columns and event types
 - [ ] Initialize the git repository
-- **Deliverable:** stack runs with `docker compose up`, report `docs/week-00.md`
 
-### Week 2: EDA & ETL
-- EDA: event_type distribution, view→cart→purchase funnel, events per user, product long tail
-- Cleaning: drop duplicates, handle null `brand`/`category_code`, drop price ≤ 0, filter bots (> 1000 events/day), normalize to UTC
-- Write Parquet partitioned by `event_date` to MinIO; time-based train/test split
-- **Deliverable:** EDA notebook, ETL job, dataset statistics table
+### Weeks 2–10: Summary
 
-### Weeks 3–4: Batch Layer
-- Weighted user–item interaction matrix; map IDs to integers
-- Baselines: Popularity, session co-occurrence Item-kNN
-- Implicit ALS: grid search over `rank` ∈ {32, 64, 128}, `regParam`, `alpha`
-- Item–item similarity: cosine on item factors, top-50 per item (Faiss or block-wise computation for large catalogs)
-- Bulk load into Redis via pipelines; Airflow DAG `nightly_batch`: ETL → train → similarity → load
-- **Deliverable:** ALS vs baselines comparison (NDCG@10, Recall@20, Precision@10, coverage)
+| Week | Pair 1: Batch | Pair 2: Real-time |
+|---|---|---|
+| 2 | Freeze contracts (whole team); EDA, ETL | Freeze contracts (whole team); Replayer, mock API |
+| 3–4 | ALS, baselines, `sim:item` | Streaming core, `sim:cooc`, trending |
+| 5 | Redis loader, Airflow DAG | API with fallback, `rec:rt` |
+| 6 | Spark optimization, batch demo script | Streamlit pages 1–2, load test |
+| 7 | Batch evaluation | Monitoring, speed-only evaluation |
+| 8 | *Integration:* batch + speed experiment, ablation | *Integration:* merge in API, end-to-end compose |
+| 9–10 | Report, scale test | Report, slides, demo video |
 
-### Weeks 5–6: Speed Layer
-- Event Replayer: read Parquet in `event_time` order, publish to topic `events` (key = `user_id`), configurable replay speed
-- Structured Streaming: watermarking; `foreachBatch` updates `user:recent`, `rec:rt`, `user:bought`; 1h window sliding every 5 minutes for trending; checkpointing
-- **Deliverable:** demo where viewing product A changes recommendations within seconds
+## 7. Evaluation
 
-### Week 7: Serving Layer & UI
-- FastAPI with 3 endpoints; merge, filter, and fallback logic; Redis reads batched in a single round-trip
-- Load test at 500–1000 RPS, measure p50/p95/p99; target p95 < 100ms
-- 3-page Streamlit UI
-- **Deliverable:** API, latency report, demo UI
+| Experiment | Owner | Measures |
+|---|---|---|
+| ALS vs baselines (Popularity, Item-kNN) | Pair 1, Week 6 | NDCG@10, Recall@20, Precision@10, coverage on the test split |
+| Speed-only | Pair 2, Week 6 | Next-item Hit Rate@K when replaying the test split |
+| Batch-only vs batch + speed | Both, Week 7 | Hit Rate@K, NDCG@K at each cart/purchase event, using recommendations just before the event |
+| Similarity ablation (cooc / item / hybrid) | Both, Week 7 | Same as above |
+| Segment analysis | Pair 1, Week 7 | Results for new / light / heavy users |
+| Latency | Pair 2, Week 5 | p50/p95/p99 at 500–1000 RPS |
 
-### Week 8: Evaluation
-- Experiment A: batch-only (ALS)
-- Experiment B: batch + speed. Replay the test set; at each cart/purchase event, take the recommendations just before it and measure Hit Rate@K, NDCG@K
-- Tune α and λ; break down results by user segment (new / light / heavy)
-- **Deliverable:** A/B comparison charts, ablation table
-
-### Weeks 9-10: Monitoring, Optimization & Report
-- Grafana: Kafka consumer lag, streaming throughput, API latency, Redis memory
-- Spark tuning: partitioning, broadcast joins, caching; (optional) scale to the full 7 months of data
-- Final report: architecture, Lambda vs Kappa, results, limitations, future work (GRU4Rec/SASRec)
-- **Deliverable:** report, slides, demo video
-
-## 7. Risks & Mitigation
+## 8. Risks & Mitigation
 
 | Risk | Mitigation |
 |---|---|
 | Out of memory during ALS/similarity | Use a subset, filter rare items, compute similarity in blocks |
 | High Redis memory usage | Store top-50 only for active users, set TTLs, use integer IDs |
-| Logic drift between batch and speed | Shared module in `common/` |
-| Speed layer does not improve metrics | Analyze the cause, tune λ and K; still a valid finding |
+| Logic drift between batch and speed | Shared contracts and scoring in `common/` |
+| One pair is delayed or blocked | Independent pipelines; API degrades gracefully; fallback plans in `assignment.md` |
+| Speed layer does not improve metrics | Analyze the cause, tune half-life and K; still a valid finding |
 | Data leakage in evaluation | Time-based split; similarity computed on training data only |
 
-## 8. Success Criteria
+## 9. Success Criteria
 
 - [ ] End-to-end run with a single Docker Compose command
 - [ ] ALS beats the Popularity baseline on NDCG@10
@@ -167,9 +209,9 @@ System monitoring uses Grafana and Kafka UI rather than custom code.
 - [ ] API reaches p95 < 100ms at the target load
 - [ ] Batch job runs automatically via Airflow, with a monitoring dashboard
 
-## 9. Weekly Report Convention
+## 10. Weekly Report Convention
 
-One file per week, `docs/week-XX.md` (e.g. `week-00.md`), with these sections:
+One file per week, `docs/week-XX.md` (e.g. `week-01.md`), with these sections:
 1. Weekly goals
 2. Completed work
 3. Results / metrics
