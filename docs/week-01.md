@@ -1,13 +1,10 @@
 # Week 1 Report: Project Setup
 
-> Items marked **[TO FILL]** are measured after running the commands on the team's machine.
-
-## Pair 1: Batch (A, B)
+## Pair 1: Batch 
 
 _Written by Pair 1._
 
-## Pair 2: Real-time (Quoc, D)
-
+## Pair 2: Real-time 
 ### 1. Weekly goals
 
 - Write the shared infrastructure file `infra/compose.base.yml` (Redis, MinIO) with the whole team.
@@ -19,13 +16,13 @@ _Written by Pair 1._
 
 | Task | Files | Owner |
 |---|---|---|
-| Shared services: Redis 7.2 (2 GB, `volatile-lru`, healthcheck, volume); MinIO + one-shot `minio-init` (AWS CLI) creating bucket `lake`, behind compose profile `lake` | `infra/compose.base.yml` | C, D (whole team) |
-| Kafka 3.8.1 in KRaft mode (no ZooKeeper), two listeners (`kafka:29092` for containers, `localhost:9092` for the host), auto topic creation disabled | `infra/compose.stream.yml` | D |
-| One-shot `kafka-init` creating topic `events` (6 partitions, 7-day retention) | `infra/compose.stream.yml` | D |
-| Kafka UI on port 8085 (8080 left free for Pair 1) | `infra/compose.stream.yml` | C |
-| Raw data inspector: header check against `RAW_COLUMNS`, event type counts, empty values, time range, events per day, out-of-order rows; writes a sample CSV | `ingestion/inspect_raw.py` | D |
-| `.dockerignore` (keeps `data/` out of build contexts), `.env.example`, `scripts/load-env.ps1` | repository root, `scripts/` | C |
-| README for `infra/` (commands, ports) | `infra/README.md` | C |
+| Shared services: Redis 7.2 (2 GB, `volatile-lru`, healthcheck, volume); MinIO + one-shot `minio-init` (AWS CLI) creating bucket `lake`, behind compose profile `lake` | `infra/compose.base.yml` |  (whole team) |
+| Kafka 3.8.1 in KRaft mode (no ZooKeeper), two listeners (`kafka:29092` for containers, `localhost:9092` for the host), auto topic creation disabled | `infra/compose.stream.yml` | Quoc|
+| One-shot `kafka-init` creating topic `events` (6 partitions, 7-day retention) | `infra/compose.stream.yml` | Quoc |
+| Kafka UI on port 8085 (8080 left free for Pair 1) | `infra/compose.stream.yml` | Quoc |
+| Raw data inspector: header check against `RAW_COLUMNS`, event type counts, empty values, time range, events per day, out-of-order rows; writes a sample CSV | `ingestion/inspect_raw.py` | Quoc |
+| `.dockerignore` (keeps `data/` out of build contexts), `.env.example`, `scripts/load-env.ps1` | repository root, `scripts/` | Quoc|
+| README for `infra/` (commands, ports) | `infra/README.md` | Quoc |
 
 ### 3. Results / metrics
 
@@ -62,5 +59,5 @@ Infrastructure check (`docker compose ... ps`): `redis` and `kafka` healthy; `ka
 ### 5. Plan for next week
 
 - Freeze the contracts in `common/` with Pair 1, export the OpenAPI spec.
-- **C:** FastAPI skeleton returning mock data.
-- **D:** Event Replayer (CSV → Kafka) with time-based pacing.
+- FastAPI skeleton returning mock data.
+- Event Replayer (CSV → Kafka) with time-based pacing
