@@ -1,0 +1,138 @@
+# Real-time pipeline services (owner: Pair 2).
+# Must be combined with compose.base.yml (Redis lives there):
+#
+#   docker compose -f infra/compose.base.yml -f infra/compose.stream.yml up -d --build
+#
+# Host ports:
+#   9092  Kafka (for clients running on the host, e.g. the replayer)
+#   8085  Kafka UI
+#   8000  Recommendation API (docs at /docs)
+#   4040  Spark UI of the streaming job
+#
+# Services added in later weeks: Streamlit (week 6), Prometheus + Grafana (week 7).
+
+services:
+  kafka:
+    image: apache/kafka:3.8.1
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # Single-node KRaft cluster (broker + controller in one process, no ZooKeeper).
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # INTERNAL = other containers (kafka:29092), EXTERNAL = host (localhost:9092)
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Topics are created explicitly by kafka-init, never by accident.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+
+  # One-shot job: creates the "events" topic (Kafka contract in common/schemas.py).
+  # 6 partitions, key = user_id, so each user's events stay ordered.
+  kafka-init:
+    image: apache/kafka:3.8.1
+    container_name: kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists
+      --topic $${TOPIC} --partitions $${PARTITIONS} --replication-factor 1
+      --config retention.ms=604800000 &&
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --describe --topic $${TOPIC}
+      "
+    environment:
+      TOPIC: ${KAFKA_TOPIC_EVENTS:-events}
+      PARTITIONS: ${KAFKA_PARTITIONS:-6}
+    restart: "no"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+
+  # Speed layer: Spark Structured Streaming, Kafka -> Redis.
+  streaming:
+    build:
+      context: ..
+      dockerfile: streaming/Dockerfile
+    container_name: streaming
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_TOPIC_EVENTS: ${KAFKA_TOPIC_EVENTS:-events}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      STARTING_OFFSETS: ${STARTING_OFFSETS:-earliest}
+      MAX_OFFSETS_PER_TRIGGER: ${MAX_OFFSETS_PER_TRIGGER:-50000}
+      TRIGGER_SECONDS: ${TRIGGER_SECONDS:-2}
+    ports:
+      - "4040:4040"
+    volumes:
+      - stream-checkpoints:/checkpoints
+    restart: unless-stopped
+
+  # Recommendation API. API_MODE=mock (week 2) returns fake data;
+  # API_MODE=redis (week 5) reads real data from Redis.
+  api:
+    build:
+      context: ..
+      dockerfile: serving/Dockerfile
+    container_name: api
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      API_MODE: ${API_MODE:-mock}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8000:8000"
+
+  # Optional: run the replayer inside Docker instead of on the host.
+  #   docker compose -f infra/compose.base.yml -f infra/compose.stream.yml \
+  #     --profile replay run --rm replayer --file /data/raw/2019-Oct.csv --speed 600
+  replayer:
+    build:
+      context: ..
+      dockerfile: ingestion/Dockerfile
+    profiles: ["replay"]
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_TOPIC_EVENTS: ${KAFKA_TOPIC_EVENTS:-events}
+    volumes:
+      - ../data:/data:ro
+
+volumes:
+  stream-checkpoints:
