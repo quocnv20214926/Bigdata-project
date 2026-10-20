@@ -5,7 +5,6 @@
 _Written by Pair 1._
 
 ## Pair 2: Real-time 
-
 ### 1. Weekly goals
 
 - Write the shared infrastructure file `infra/compose.base.yml` (Redis, MinIO) with the whole team.
@@ -61,4 +60,4 @@ Infrastructure check (`docker compose ... ps`): `redis` and `kafka` healthy; `ka
 
 - Freeze the contracts in `common/` with Pair 1, export the OpenAPI spec.
 - FastAPI skeleton returning mock data.
-- Event Replayer (CSV → Kafka) with time-based pacing.
+- Event Replayer (CSV → Kafka) with time-based pacing
