@@ -1,0 +1,88 @@
+# Shared services used by both pipelines (owner: whole team).
+#
+# Run alone:      docker compose -f infra/compose.base.yml up -d          (Redis only)
+# With MinIO:     docker compose --profile lake -f infra/compose.base.yml up -d
+# Run with Pair 2: docker compose -f infra/compose.base.yml -f infra/compose.stream.yml up -d
+#
+# All compose files share one project name so services see each other by name.
+name: recsys
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: redis
+    command:
+      - redis-server
+      - --appendonly
+      - "no"
+      - --save
+      - "300 1000"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-2gb}
+      # Under memory pressure evict keys that have a TTL (speed-layer keys) first;
+      # batch keys have no TTL and are never evicted.
+      - --maxmemory-policy
+      - volatile-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # MinIO (S3-compatible data lake) is only needed by Pair 1, so it sits behind
+  # the "lake" profile:   docker compose --profile lake -f infra/compose.base.yml ... up -d
+  #
+  # Docker Hub deleted minio/minio and minio/mc in September 2026, so the
+  # Chainguard build is used. It is distroless (no shell, no mc), therefore:
+  #   - no in-container healthcheck; minio-init waits for the S3 API instead
+  #   - runs as root so it can write to the named volume
+  # Override with MINIO_IMAGE in .env if needed.
+  minio:
+    image: ${MINIO_IMAGE:-cgr.dev/chainguard/minio:latest}
+    container_name: minio
+    profiles: ["lake"]
+    user: "0:0"
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # web console
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  # One-shot job: waits until the S3 API answers, then creates bucket "lake"
+  # with the AWS CLI. Exits with code 0 when the bucket exists.
+  minio-init:
+    image: amazon/aws-cli:latest
+    container_name: minio-init
+    profiles: ["lake"]
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      for i in $$(seq 1 30); do
+        aws --endpoint-url http://minio:9000 s3 ls > /dev/null 2>&1 && break;
+        echo 'waiting for minio...'; sleep 2;
+      done;
+      aws --endpoint-url http://minio:9000 s3api head-bucket --bucket lake 2>/dev/null ||
+      aws --endpoint-url http://minio:9000 s3 mb s3://lake &&
+      aws --endpoint-url http://minio:9000 s3 ls &&
+      echo 'bucket lake ready'
+      "
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-minioadmin}
+      AWS_DEFAULT_REGION: us-east-1
+    restart: "no"
+
+volumes:
+  redis-data:
+  minio-data:

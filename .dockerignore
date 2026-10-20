@@ -1,0 +1,11 @@
+# Keep Docker build contexts small: never send raw data or local state.
+data/
+.git/
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+checkpoints/
+notebooks/
+spark-warehouse/
+.pytest_cache/
