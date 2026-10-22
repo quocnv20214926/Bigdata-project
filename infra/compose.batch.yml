@@ -41,7 +41,8 @@ services:
       - "8090:8080"
     volumes: *spark-volumes
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/7077'"]
+      # The master binds to SPARK_MASTER_HOST (the container IP), not localhost.
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/spark-master/7077'"]
       interval: 10s
       timeout: 5s
       retries: 12
