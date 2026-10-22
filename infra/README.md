@@ -33,5 +33,6 @@ docker compose --profile lake -f infra/compose.base.yml -f infra/compose.batch.y
 | 8085 | Kafka UI |
 | 8000 | Recommendation API (`/docs`) |
 | 4040 | Spark UI of the streaming job |
-
-Port 8080 is left free for Pair 1 (Spark master / Airflow).
+| 7077 | Spark master (`compose.batch.yml`) |
+| 8090 / 8091 | Spark master / worker UI (`compose.batch.yml`) |
+| 8080 | Airflow web UI (`compose.batch.yml`); admin password in `docker compose logs airflow` |

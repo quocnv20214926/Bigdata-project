@@ -1,0 +1,92 @@
+# Batch pipeline services (owner: Pair 1).
+# Must be combined with compose.base.yml (Redis, MinIO live there):
+#
+#   docker compose --profile lake -f infra/compose.base.yml -f infra/compose.batch.yml up -d
+#
+# Host ports:
+#   7077  Spark master (spark://localhost:7077)
+#   8090  Spark master UI
+#   8091  Spark worker UI
+#   8080  Airflow web UI (user "admin", password printed in `docker compose logs airflow`)
+#
+# Code is mounted, not baked into images, so edits in batch/ and common/ are picked up
+# without a rebuild. Spark jobs reach MinIO through s3a://; add the Hadoop AWS jars at submit time:
+#   --packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262
+
+x-spark-env: &spark-env
+  S3_ENDPOINT: http://minio:9000
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+  RAW_PATH: ${RAW_PATH:-s3a://lake/raw/}
+  CLEAN_PATH: ${CLEAN_PATH:-s3a://lake/clean/events/}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  PYTHONPATH: /opt/project
+
+x-spark-volumes: &spark-volumes
+  - ../batch:/opt/project/batch
+  - ../common:/opt/project/common:ro
+  - ../data:/opt/project/data
+
+services:
+  spark-master:
+    image: ${SPARK_IMAGE:-apache/spark:3.5.3}
+    container_name: spark-master
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
+    environment:
+      <<: *spark-env
+      SPARK_MASTER_HOST: spark-master
+    ports:
+      - "7077:7077"
+      - "8090:8080"
+    volumes: *spark-volumes
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/7077'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  spark-worker:
+    image: ${SPARK_IMAGE:-apache/spark:3.5.3}
+    container_name: spark-worker
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    environment:
+      <<: *spark-env
+      # ALS on one month of REES46 needs several GB; lower these on small machines.
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-4}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-6g}
+    ports:
+      - "8091:8081"
+    volumes: *spark-volumes
+
+  # Orchestration of the nightly batch (DAG `nightly_batch`, week 5).
+  # `airflow standalone` = scheduler + webserver + SQLite metadata DB in one container,
+  # enough for a single-machine demo. DAG files live in batch/dags/.
+  airflow:
+    image: ${AIRFLOW_IMAGE:-apache/airflow:2.10.5-python3.11}
+    container_name: airflow
+    command: standalone
+    depends_on:
+      spark-master:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *spark-env
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/project/batch/dags
+      SPARK_MASTER_URL: spark://spark-master:7077
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../batch:/opt/project/batch
+      - ../common:/opt/project/common:ro
+      - ../data:/opt/project/data
+      - airflow-home:/opt/airflow
+    restart: unless-stopped
+
+volumes:
+  airflow-home:
