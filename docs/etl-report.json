@@ -1,0 +1,70 @@
+{
+  "input": [
+    "s3a://lake/raw/"
+  ],
+  "output": "s3a://lake/clean/events/",
+  "rows_read": 109950743,
+  "kept_before_dedup": 109950743,
+  "dropped": {},
+  "write_seconds": 296.5,
+  "clean": {
+    "rows": 109820004,
+    "users": 5316649,
+    "products": 206876,
+    "first_event_time": "2019-10-01 00:00:00",
+    "last_event_time": "2019-11-30 23:59:59",
+    "null_category_code": 35383685,
+    "null_brand": 15321303,
+    "null_user_session": 12,
+    "zero_price": 256657,
+    "event_types": {
+      "purchase": 1659703,
+      "view": 104331840,
+      "cart": 3828461
+    }
+  },
+  "duplicates_removed": 130739,
+  "split": {
+    "train": {
+      "from": "2019-10-01",
+      "to": "2019-11-15",
+      "rows": 74971956,
+      "users": 4205076,
+      "products": 191909,
+      "first_event_time": "2019-10-01 00:00:00",
+      "last_event_time": "2019-11-15 23:59:21",
+      "null_category_code": 23966314,
+      "null_brand": 10624095,
+      "null_user_session": 6,
+      "zero_price": 158812,
+      "event_types": {
+        "purchase": 1074866,
+        "view": 71808151,
+        "cart": 2088939
+      }
+    },
+    "test": {
+      "from": "2019-11-16",
+      "to": "2019-11-30",
+      "rows": 34848048,
+      "users": 2438946,
+      "products": 174010,
+      "first_event_time": "2019-11-16 00:02:29",
+      "last_event_time": "2019-11-30 23:59:59",
+      "null_category_code": 11417371,
+      "null_brand": 4697208,
+      "null_user_session": 6,
+      "zero_price": 97845,
+      "event_types": {
+        "purchase": 584837,
+        "view": 32523689,
+        "cart": 1739522
+      }
+    },
+    "test_users_not_in_train": 1111573,
+    "test_users_not_in_train_share": 0.4558,
+    "test_buyers": 302610,
+    "test_buyers_not_in_train": 87440
+  },
+  "total_seconds": 366.1
+}
