@@ -37,7 +37,7 @@ class Settings:
     clean_path: str = field(default_factory=lambda: _env("CLEAN_PATH", "s3a://lake/clean/events/"))
 
     # Sizes of stored lists (part of the Redis contract)
-    batch_top_n: int = 100      # items per user in rec:batch
+    batch_top_n: int = 50       # items per user in rec:batch (1.2.0: was 100, docs/week-04.md)
     sim_top_n: int = 50         # neighbours per item in sim:item / sim:cooc
     recent_n: int = 20          # events per user in user:recent
     session_window: int = 10    # previous items in a session used for co-occurrence

@@ -60,7 +60,7 @@ Each key has exactly one writer pipeline. The authoritative definition is `commo
 
 | Key | Type | Writer | TTL | Value |
 |---|---|---|---|---|
-| `rec:batch:{user_id}` | ZSET | Batch | Overwritten nightly | product → ALS score |
+| `rec:batch:{user_id}` | ZSET | Batch | Overwritten nightly | top-50 product → ALS score, for the most recently active users that fit the Redis budget |
 | `sim:item:{product_id}` | ZSET | Batch | Overwritten nightly | top-50 product → cosine similarity |
 | `pop:cat:{category_id}`, `pop:global` | ZSET | Batch | Overwritten nightly | product → long-term popularity |
 | `meta:batch:last_run` | STRING | Batch | none | timestamp of last load |
