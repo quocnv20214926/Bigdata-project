@@ -1,0 +1,336 @@
+{
+  "protocol": {
+    "fit": [
+      "2019-10-01",
+      "2019-11-08"
+    ],
+    "validation": [
+      "2019-11-09",
+      "2019-11-15"
+    ],
+    "truth_events": [
+      "view",
+      "cart",
+      "purchase"
+    ],
+    "eval_users_requested": 100000,
+    "filter": {
+      "min_users_per_product": 5,
+      "min_products_per_user": 2
+    },
+    "ks": [
+      10,
+      20
+    ],
+    "metric": "ndcg@10",
+    "search": "coordinate"
+  },
+  "grid": {
+    "alpha": [
+      1.0,
+      5.0,
+      10.0,
+      20.0,
+      40.0
+    ],
+    "reg_param": [
+      0.01,
+      0.1,
+      1.0
+    ],
+    "rank": [
+      32,
+      64,
+      128
+    ]
+  },
+  "start": {
+    "rank": 32,
+    "reg_param": 0.1,
+    "alpha": 10.0,
+    "max_iter": 10,
+    "seed": 42,
+    "checkpoint_interval": 1
+  },
+  "data": {
+    "interactions": {
+      "pairs": 30400288,
+      "users": 3636150,
+      "products": 178195,
+      "density": 4.692e-05
+    },
+    "als_matrix": {
+      "pairs": 29152789,
+      "users": 2465378,
+      "products": 140077,
+      "density": 8.442e-05
+    },
+    "ground_truth": {
+      "users": 100000,
+      "pairs": 940118
+    }
+  },
+  "trials": [
+    {
+      "params": {
+        "rank": 32,
+        "reg_param": 0.1,
+        "alpha": 1.0,
+        "max_iter": 10,
+        "seed": 42,
+        "checkpoint_interval": 1
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.055679,
+        "recall@10": 0.10896,
+        "hit_rate@10": 0.30115,
+        "ndcg@10": 0.108178,
+        "precision@20": 0.040282,
+        "recall@20": 0.145425,
+        "hit_rate@20": 0.35785,
+        "ndcg@20": 0.115759,
+        "coverage@10": 0.002292
+      },
+      "seconds": {
+        "train": 91.4,
+        "total": 167.0
+      }
+    },
+    {
+      "params": {
+        "rank": 32,
+        "reg_param": 0.1,
+        "alpha": 5.0,
+        "max_iter": 10,
+        "seed": 42,
+        "checkpoint_interval": 1
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.059946,
+        "recall@10": 0.119066,
+        "hit_rate@10": 0.3255,
+        "ndcg@10": 0.114753,
+        "precision@20": 0.043289,
+        "recall@20": 0.158055,
+        "hit_rate@20": 0.38594,
+        "ndcg@20": 0.123045,
+        "coverage@10": 0.004083
+      },
+      "seconds": {
+        "train": 95.0,
+        "total": 168.7
+      }
+    },
+    {
+      "params": {
+        "rank": 32,
+        "reg_param": 0.1,
+        "alpha": 10.0,
+        "max_iter": 10,
+        "seed": 42,
+        "checkpoint_interval": 1
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.060084,
+        "recall@10": 0.119953,
+        "hit_rate@10": 0.32857,
+        "ndcg@10": 0.113882,
+        "precision@20": 0.043724,
+        "recall@20": 0.160734,
+        "hit_rate@20": 0.39218,
+        "ndcg@20": 0.122939,
+        "coverage@10": 0.005297
+      },
+      "seconds": {
+        "train": 93.4,
+        "total": 167.4
+      }
+    },
+    {
+      "params": {
+        "rank": 32,
+        "reg_param": 0.1,
+        "alpha": 20.0,
+        "max_iter": 10,
+        "seed": 42,
+        "checkpoint_interval": 1
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.059184,
+        "recall@10": 0.118752,
+        "hit_rate@10": 0.3277,
+        "ndcg@10": 0.110948,
+        "precision@20": 0.043712,
+        "recall@20": 0.161739,
+        "hit_rate@20": 0.39558,
+        "ndcg@20": 0.121095,
+        "coverage@10": 0.007068
+      },
+      "seconds": {
+        "train": 89.7,
+        "total": 161.4
+      }
+    },
+    {
+      "params": {
+        "rank": 32,
+        "reg_param": 0.1,
+        "alpha": 40.0,
+        "max_iter": 10,
+        "seed": 42,
+        "checkpoint_interval": 1
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.057435,
+        "recall@10": 0.116441,
+        "hit_rate@10": 0.32384,
+        "ndcg@10": 0.106283,
+        "precision@20": 0.043063,
+        "recall@20": 0.161039,
+        "hit_rate@20": 0.3952,
+        "ndcg@20": 0.117457,
+        "coverage@10": 0.009952
+      },
+      "seconds": {
+        "train": 89.5,
+        "total": 161.2
+      }
+    },
+    {
+      "params": {
+        "rank": 32,
+        "reg_param": 0.01,
+        "alpha": 5.0,
+        "max_iter": 10,
+        "seed": 42,
+        "checkpoint_interval": 1
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.05951,
+        "recall@10": 0.1184,
+        "hit_rate@10": 0.32558,
+        "ndcg@10": 0.114398,
+        "precision@20": 0.042946,
+        "recall@20": 0.157173,
+        "hit_rate@20": 0.38558,
+        "ndcg@20": 0.122648,
+        "coverage@10": 0.003727
+      },
+      "seconds": {
+        "train": 94.3,
+        "total": 166.3
+      }
+    },
+    {
+      "params": {
+        "rank": 32,
+        "reg_param": 1.0,
+        "alpha": 5.0,
+        "max_iter": 10,
+        "seed": 42,
+        "checkpoint_interval": 1
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.059444,
+        "recall@10": 0.11666,
+        "hit_rate@10": 0.31525,
+        "ndcg@10": 0.112926,
+        "precision@20": 0.043497,
+        "recall@20": 0.157935,
+        "hit_rate@20": 0.37682,
+        "ndcg@20": 0.121989,
+        "coverage@10": 0.005618
+      },
+      "seconds": {
+        "train": 92.5,
+        "total": 166.5
+      }
+    },
+    {
+      "params": {
+        "rank": 64,
+        "reg_param": 0.1,
+        "alpha": 5.0,
+        "max_iter": 10,
+        "seed": 42,
+        "checkpoint_interval": 1
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.063343,
+        "recall@10": 0.125113,
+        "hit_rate@10": 0.34143,
+        "ndcg@10": 0.12168,
+        "precision@20": 0.04547,
+        "recall@20": 0.164638,
+        "hit_rate@20": 0.40154,
+        "ndcg@20": 0.129806,
+        "coverage@10": 0.007632
+      },
+      "seconds": {
+        "train": 259.2,
+        "total": 350.7
+      }
+    },
+    {
+      "params": {
+        "rank": 128,
+        "reg_param": 0.1,
+        "alpha": 5.0,
+        "max_iter": 10,
+        "seed": 42,
+        "checkpoint_interval": 1
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.066009,
+        "recall@10": 0.129832,
+        "hit_rate@10": 0.35492,
+        "ndcg@10": 0.127305,
+        "precision@20": 0.046863,
+        "recall@20": 0.167696,
+        "hit_rate@20": 0.41213,
+        "ndcg@20": 0.134531,
+        "coverage@10": 0.013985
+      },
+      "seconds": {
+        "train": 1136.2,
+        "total": 1257.3
+      }
+    }
+  ],
+  "seconds": {
+    "prepare": 54.7,
+    "total": 2821.1
+  },
+  "best": {
+    "params": {
+      "rank": 128,
+      "reg_param": 0.1,
+      "alpha": 5.0,
+      "max_iter": 10,
+      "seed": 42,
+      "checkpoint_interval": 1
+    },
+    "metrics": {
+      "users": 100000,
+      "precision@10": 0.066009,
+      "recall@10": 0.129832,
+      "hit_rate@10": 0.35492,
+      "ndcg@10": 0.127305,
+      "precision@20": 0.046863,
+      "recall@20": 0.167696,
+      "hit_rate@20": 0.41213,
+      "ndcg@20": 0.134531,
+      "coverage@10": 0.013985
+    }
+  },
+  "input": "s3a://lake/clean/events/"
+}

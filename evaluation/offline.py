@@ -23,6 +23,7 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 from pyspark.sql import DataFrame, functions as F
 
@@ -54,6 +55,37 @@ def sample_users(users: DataFrame, n: int, seed: int) -> DataFrame:
     return users.orderBy(F.xxhash64(F.col("user_id"), F.lit(seed))).limit(n)
 
 
+class Prepared(NamedTuple):
+    matrix: DataFrame    # filtered interaction matrix, cached
+    users: DataFrame     # evaluated users, cached
+    truth: DataFrame     # their ground truth, cached
+    data: dict           # sizes for the report
+
+
+def prepare(train: DataFrame, test: DataFrame, eval_users: int = DEFAULT_EVAL_USERS,
+            truth_events=TRUTH_EVENTS, seed: int = 42) -> Prepared:
+    """Interaction matrix from `train`, evaluated users and their ground truth from `test`."""
+    interactions = interaction_scores(train).cache()
+    matrix = filter_rare(interactions).cache()
+    data = {"interactions": matrix_stats(interactions), "als_matrix": matrix_stats(matrix)}
+    interactions.unpersist()    # only the filtered matrix is used from here on
+
+    truth_all = ground_truth(test, truth_events)
+    candidates = truth_all.select("user_id").distinct().join(matrix.select("user_id"), "user_id", "left_semi")
+    users = sample_users(candidates, eval_users, seed).cache()
+    truth = truth_all.join(users, "user_id", "left_semi").cache()
+    data["ground_truth"] = {"users": users.count(), "pairs": truth.count()}
+    return Prepared(matrix, users, truth, data)
+
+
+def score(recs: DataFrame, truth: DataFrame, ks, catalog_size: int) -> dict:
+    """Ranking metrics at each k, plus catalog coverage at the smallest k."""
+    result = ranking_metrics(recs, truth, ks)
+    k_min = min(ks)
+    result[f"coverage@{k_min}"] = catalog_coverage(recs, k_min, catalog_size)
+    return result
+
+
 def run(train: DataFrame, test: DataFrame, params: als.ALSParams = als.ALSParams(),
         eval_users: int = DEFAULT_EVAL_USERS, truth_events=TRUTH_EVENTS, ks=DEFAULT_KS,
         model_out: str | None = None, knn_params: item_knn.KNNParams = item_knn.KNNParams(),
@@ -61,17 +93,8 @@ def run(train: DataFrame, test: DataFrame, params: als.ALSParams = als.ALSParams
     timings: dict[str, float] = {}
     started = time.time()
 
-    interactions = interaction_scores(train).cache()
-    matrix = filter_rare(interactions).cache()
-    data = {"interactions": matrix_stats(interactions), "als_matrix": matrix_stats(matrix)}
-    interactions.unpersist()    # only the filtered matrix is used from here on
+    matrix, users, truth, data = prepare(train, test, eval_users, truth_events, params.seed)
     timings["interactions"] = round(time.time() - started, 1)
-
-    truth_all = ground_truth(test, truth_events)
-    candidates = truth_all.select("user_id").distinct().join(matrix.select("user_id"), "user_id", "left_semi")
-    users = sample_users(candidates, eval_users, params.seed).cache()
-    truth = truth_all.join(users, "user_id", "left_semi").cache()
-    data["ground_truth"] = {"users": users.count(), "pairs": truth.count()}
 
     k_max = max(ks)
     recs = {}
@@ -104,12 +127,10 @@ def run(train: DataFrame, test: DataFrame, params: als.ALSParams = als.ALSParams
         recs["als"].count()
         timings["als_recommend"] = round(time.time() - t, 1)
 
-    k_min = min(ks)
     results = {}
     for name, r in recs.items():
         t = time.time()
-        results[name] = ranking_metrics(r, truth, ks)
-        results[name][f"coverage@{k_min}"] = catalog_coverage(r, k_min, data["als_matrix"]["products"])
+        results[name] = score(r, truth, ks, data["als_matrix"]["products"])
         timings[f"evaluate_{name}"] = round(time.time() - t, 1)
     timings["total"] = round(time.time() - started, 1)
 

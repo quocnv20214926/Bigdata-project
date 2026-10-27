@@ -4,6 +4,9 @@ Spark's implicit ALS uses the confidence c = 1 + alpha * r. Training on
 r = log(1 + score) therefore gives exactly common.weights.als_confidence(score, alpha),
 the formula in docs/plan.md section 3.3.
 
+The default parameters are the best of the week 4 search on the validation week
+(evaluation/tune_als.py, docs/eval-week04-tuning.json): rank 128, regParam 0.1, alpha 5.
+
 REES46 user_id and product_id fit in a 32-bit int, which Spark ALS requires;
 it raises an error if an id does not.
 """
@@ -13,16 +16,15 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 from pyspark.ml.recommendation import ALS, ALSModel
-from pyspark.sql import DataFrame, functions as F
+from pyspark.sql import DataFrame, SparkSession, functions as F
 
-from common.weights import DEFAULT_ALS_ALPHA
 
 
 @dataclass(frozen=True)
 class ALSParams:
-    rank: int = 64
+    rank: int = 128
     reg_param: float = 0.1
-    alpha: float = DEFAULT_ALS_ALPHA
+    alpha: float = 5.0      # week 3 used common.weights.DEFAULT_ALS_ALPHA (10)
     max_iter: int = 10
     seed: int = 42
     # With a checkpoint dir set, factors are saved every N iterations; this cuts the lineage
@@ -66,3 +68,14 @@ def recommend(model: ALSModel, users: DataFrame, k: int) -> DataFrame:
                     F.col("rec.product_id").alias("product_id"),
                     (F.col("pos") + 1).alias("rank"),
                     F.col("rec.rating").alias("score")))
+
+
+def release(spark: SparkSession) -> None:
+    """Unpersist the factor RDDs that fit() leaves cached ("userFactors", "itemFactors").
+
+    Spark frees them only once the model is garbage-collected; when many models are trained in
+    one session (evaluation/tune_als.py) they would otherwise pile up in memory and on disk.
+    """
+    for rdd in spark.sparkContext._jsc.getPersistentRDDs().values():
+        if rdd.name() in ("userFactors", "itemFactors"):
+            rdd.unpersist(False)
