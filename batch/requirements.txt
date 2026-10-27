@@ -1,1 +1,2 @@
 pyspark==3.5.9
+numpy>=1.21    # required by pyspark.ml (ALS)

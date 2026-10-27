@@ -163,9 +163,9 @@ The team works in 2 fixed pairs, each owning one pipeline. The detailed weekly a
 ### Week 1: Project Setup
 - [x] Create repository structure, README, and plan
 - [x] Draft shared contracts in `common/`
-- [ ] Write the three Docker Compose files in `infra/`
-- [ ] Download the dataset into `data/raw/`, verify columns and event types
-- [ ] Initialize the git repository
+- [x] Write the three Docker Compose files in `infra/`
+- [x] Download the dataset into `data/raw/`, verify columns and event types
+- [x] Initialize the git repository
 
 ### Weeks 2–10: Summary
 
@@ -204,7 +204,7 @@ The team works in 2 fixed pairs, each owning one pipeline. The detailed weekly a
 ## 9. Success Criteria
 
 - [ ] End-to-end run with a single Docker Compose command
-- [ ] ALS beats the Popularity baseline on NDCG@10
+- [x] ALS beats the Popularity baseline on NDCG@10 (week 3: 0.1158 vs 0.0691, `docs/week-03.md`)
 - [ ] Batch + speed beats batch-only on Hit Rate@10, especially for new users
 - [ ] API reaches p95 < 100ms at the target load
 - [ ] Batch job runs automatically via Airflow, with a monitoring dashboard
