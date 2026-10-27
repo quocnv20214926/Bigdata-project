@@ -10,7 +10,7 @@ step on its own, and the very same commands can be run by hand:
   popularity  clean Parquet                      pop_global/, pop_cat/
   train       clean Parquet                      model/ (ALS), activity/ (each user's last event)
   recommend   model/, activity/                  rec_batch/ (most recent users within the budget)
-  sim         model/                             sim_item/
+  sim         clean Parquet (or model/)          sim_item/ (Item-kNN; --sim-source als: ALS factors)
   load        rec_batch/, sim_item/, pop_*/      Redis (batch/redis_loader.py)
   validate    Redis                              -   (fails on empty families or a full Redis)
   cleanup     --root                             keeps only the newest --keep-runs run folders
@@ -35,7 +35,7 @@ from pathlib import Path
 from pyspark.ml.recommendation import ALSModel
 from pyspark.sql import DataFrame, SparkSession, functions as F
 
-from batch import als, rec_batch, redis_loader, sim_item
+from batch import als, item_knn, rec_batch, redis_loader, sim_item
 from batch.interactions import filter_rare, interaction_scores, matrix_stats
 from batch.popularity import product_popularity, top_by_category, top_global
 from batch.spark_session import get_spark
@@ -44,6 +44,9 @@ from common.config import settings
 from common.schemas import CLEAN_PARTITION_COLUMN
 
 STEPS = ("check", "popularity", "train", "recommend", "sim", "load", "validate", "cleanup")
+# sim:item source. Item-kNN won every quality measure of the week 4 comparison
+# (docs/week-04.md); the ALS factor table is kept for the similarity ablation.
+SIM_SOURCES = ("item_knn", "als")
 DEFAULT_ROOT = os.getenv("BATCH_ROOT", "s3a://lake/batch/")
 DEFAULT_STATS_DIR = os.getenv("BATCH_STATS_DIR", "data/batch-runs")
 
@@ -130,10 +133,15 @@ def recommend(spark, cfg) -> dict:
 
 
 def sim(spark, cfg) -> dict:
-    model = ALSModel.load(path(cfg, "model"))
-    sim_item.from_model(model, block_size=cfg.sim_block_size).write.mode("overwrite").parquet(path(cfg, "sim_item"))
+    if cfg.sim_source == "als":
+        model = ALSModel.load(path(cfg, "model"))
+        table, candidates = sim_item.from_model(model, block_size=cfg.sim_block_size), model.itemFactors.count()
+    else:
+        matrix = filter_rare(interaction_scores(events(spark, cfg))).cache()   # the matrix ALS is trained on
+        table, candidates = item_knn.similarities(matrix), matrix.select("product_id").distinct().count()
+    table.select("product_id", "neighbour_id", "sim").write.mode("overwrite").parquet(path(cfg, "sim_item"))
     s = spark.read.parquet(path(cfg, "sim_item")).agg(F.countDistinct("product_id"), F.count("*"), F.avg("sim")).first()
-    return {"items_in_model": model.itemFactors.count(), "products": s[0], "rows": s[1],
+    return {"source": cfg.sim_source, "products_in_matrix": candidates, "products": s[0], "rows": s[1],
             "mean_sim": round(s[2] or 0.0, 4)}
 
 
@@ -201,7 +209,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--top-n", type=int, default=settings.batch_top_n, help="products per user in rec:batch")
     p.add_argument("--max-users", type=int, default=0, help="rec:batch users, 0 = as many as the budget allows")
     p.add_argument("--pop-n", type=int, default=settings.batch_top_n, help="products in pop:global and each pop:cat")
-    p.add_argument("--sim-block-size", type=int, default=sim_item.DEFAULT_BLOCK_SIZE)
+    p.add_argument("--sim-source", choices=SIM_SOURCES, default=SIM_SOURCES[0], help="where sim:item comes from")
+    p.add_argument("--sim-block-size", type=int, default=sim_item.DEFAULT_BLOCK_SIZE, help="--sim-source als only")
     p.add_argument("--redis-host", default=settings.redis_host)
     p.add_argument("--redis-port", type=int, default=settings.redis_port)
     p.add_argument("--redis-db", type=int, default=settings.redis_db)

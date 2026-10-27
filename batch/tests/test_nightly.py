@@ -65,7 +65,11 @@ def test_every_step(spark, tmp_path):
     r = run("recommend", "--max-users", "10")
     assert r["users"] == 10 and r["rows"] == 50 and r["als_users"] == 30
     sim = run("sim")
-    assert sim["items_in_model"] == 12 and 0 < sim["rows"] <= 12 * 11     # at most 11 others each
+    assert sim["source"] == "item_knn" and sim["products_in_matrix"] == 12
+    assert 0 < sim["products"] <= 12 and 0 < sim["rows"] <= 12 * 5      # only products of the same group meet
+    als_sim = nightly.run_step(spark, "sim", config(tmp_path, "sim", "--sim-source", "als"))
+    assert als_sim["products_in_matrix"] == 12 and 0 < als_sim["rows"] <= 12 * 11
+    sim = run("sim")                                                    # back to the default table for load
 
     recs = spark.read.parquet(str(tmp_path / "runs" / "20261028" / "rec_batch"))
     assert {c for c in recs.columns} == {"user_id", "product_id", "rank", "score"}

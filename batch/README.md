@@ -10,8 +10,8 @@ Raw REES46 CSV -> clean Parquet -> ALS -> Redis. Code here follows the contracts
 | `interactions.py` | Interaction matrix: summed event weights per (user, product); ALS filter (product >= 5 users, then user >= 2 products) |
 | `popularity.py` | Long-term popularity: Popularity baseline, and the lists for `pop:global` / `pop:cat` |
 | `als.py` | Implicit ALS (Spark MLlib) trained on `log(1 + score)`, so its confidence equals `common.weights.als_confidence` |
-| `item_knn.py` | Item-kNN baseline: cosine between product vectors over users (`log(1 + score)`), top 50 neighbours per product |
-| `sim_item.py` | `sim:item`: exact cosine top-50 between ALS item factors (broadcast factors, numpy block product per task) |
+| `item_knn.py` | Item-kNN: cosine between product vectors over users (`log(1 + score)`), top 50 neighbours per product; baseline, and the `sim:item` table since week 5 |
+| `sim_item.py` | Exact cosine top-50 between ALS item factors (broadcast factors, numpy block product per task); the week 4 `sim:item` candidate, kept for the ablation |
 | `rec_batch.py` | Redis budget of the batch keys (1 GiB) and which users get `rec:batch` (most recently active ALS users that fit) |
 | `redis_sizing.py` | Measures Redis memory per key on a live Redis; validation-week coverage of top-50 vs top-100 |
 | `redis_loader.py` | Bulk loader: `pop:*`, `sim:item`, `rec:batch` from Spark, budget check, stale keys removed, `meta:batch:last_run` last |
@@ -129,7 +129,7 @@ What lands in Redis (keys from `common/redis_keys.py`, scores rounded to 4 decim
 | Key | Content | Size |
 |---|---|---|
 | `rec:batch:{user_id}` | top `batch_top_n` ALS products for the most recently active ALS users | as many users as fit 860 MiB |
-| `sim:item:{product_id}` | top 50 neighbours by cosine of the ALS item factors, sim > 0 | about 125 MB |
+| `sim:item:{product_id}` | top 50 Item-kNN neighbours (cosine over users, at least 2 users in common); `--sim-source als` for the ALS factor table | about 90 MB |
 | `pop:global`, `pop:cat:{category_id}` | top 100 products by summed event weights | a few MB |
 | `meta:batch:last_run` | ISO 8601 UTC time of the load, written last | |
 
