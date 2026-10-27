@@ -131,9 +131,11 @@ def run(spark: SparkSession, inputs: list[str], output: str, start: date | None 
     result["write_seconds"] = round(time.time() - started, 1)
 
     written = spark.read.parquet(output)
-    if start or end:
-        lo, hi = start or date.min, end or date.max
-        written = written.where(F.col(CLEAN_PARTITION_COLUMN).between(F.lit(lo), F.lit(hi)))
+    # One bound at a time: date.min would reach Java as "1-01-01" on Linux (glibc strftime) and fail.
+    if start:
+        written = written.where(F.col(CLEAN_PARTITION_COLUMN) >= F.lit(start))
+    if end:
+        written = written.where(F.col(CLEAN_PARTITION_COLUMN) <= F.lit(end))
     result["clean"] = summarize(written)
     result["duplicates_removed"] = result["kept_before_dedup"] - result["clean"]["rows"]
     if report:
