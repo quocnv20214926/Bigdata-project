@@ -184,8 +184,8 @@ def main() -> None:
     p.add_argument("--alphas", type=float, nargs="+", default=list(DEFAULT_ALPHAS))
     p.add_argument("--regs", type=float, nargs="+", default=list(DEFAULT_REGS))
     p.add_argument("--ranks", type=int, nargs="+", default=list(DEFAULT_RANKS))
-    p.add_argument("--start-rank", type=int, default=DEFAULT_RANKS[0],
-                   help="coordinate search: rank used while alpha and regParam are tuned")
+    p.add_argument("--start-rank", type=int,
+                   help="coordinate search: rank used while alpha and regParam are tuned (default: first of --ranks)")
     p.add_argument("--start-reg", type=float, default=defaults.reg_param)
     p.add_argument("--start-alpha", type=float, default=defaults.alpha)
     p.add_argument("--iter", type=int, default=defaults.max_iter)
@@ -201,7 +201,7 @@ def main() -> None:
 
     spark = get_spark("batch-tune-als", s3=not args.no_s3)
     spark.sparkContext.setLogLevel("WARN")
-    start = als.ALSParams(rank=args.start_rank, reg_param=args.start_reg, alpha=args.start_alpha,
+    start = als.ALSParams(rank=args.start_rank or args.ranks[0], reg_param=args.start_reg, alpha=args.start_alpha,
                           max_iter=args.iter, seed=args.seed, checkpoint_interval=args.checkpoint_interval)
     grid = {"alpha": args.alphas, "reg_param": args.regs, "rank": args.ranks}
 
