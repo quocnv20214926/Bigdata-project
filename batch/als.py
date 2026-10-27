@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 from pyspark.ml.recommendation import ALS, ALSModel
-from pyspark.sql import DataFrame, functions as F
+from pyspark.sql import DataFrame, SparkSession, functions as F
 
 from common.weights import DEFAULT_ALS_ALPHA
 
@@ -66,3 +66,14 @@ def recommend(model: ALSModel, users: DataFrame, k: int) -> DataFrame:
                     F.col("rec.product_id").alias("product_id"),
                     (F.col("pos") + 1).alias("rank"),
                     F.col("rec.rating").alias("score")))
+
+
+def release(spark: SparkSession) -> None:
+    """Unpersist the factor RDDs that fit() leaves cached ("userFactors", "itemFactors").
+
+    Spark frees them only once the model is garbage-collected; when many models are trained in
+    one session (evaluation/tune_als.py) they would otherwise pile up in memory and on disk.
+    """
+    for rdd in spark.sparkContext._jsc.getPersistentRDDs().values():
+        if rdd.name() in ("userFactors", "itemFactors"):
+            rdd.unpersist(False)
