@@ -7,7 +7,7 @@ the speed layer adds w * sim(i, j) * decay to rt[j], so a negative cosine would 
 
 The result is exact, not approximate. With about 155,000 products there are 12 billion pairs,
 far too many to join as DataFrame rows, so the normalised factors (products x rank floats, about
-40 MB at rank 64) are broadcast to every task and each task scores one block of `block_size`
+80 MB at rank 128) are broadcast to every task and each task scores one block of `block_size`
 products against all of them with a single matrix product (numpy), keeping the top n of each row.
 Memory per task is about block_size x products x 12 bytes (the scores and their argpartition).
 
