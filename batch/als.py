@@ -25,6 +25,9 @@ class ALSParams:
     alpha: float = DEFAULT_ALS_ALPHA
     max_iter: int = 10
     seed: int = 42
+    # With a checkpoint dir set, factors are saved every N iterations; this cuts the lineage
+    # so Spark can delete the shuffle files of earlier iterations (they filled a laptop disk).
+    checkpoint_interval: int = 2
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -47,6 +50,7 @@ def train(interactions: DataFrame, params: ALSParams = ALSParams()) -> ALSModel:
         ratingCol="rating",
         coldStartStrategy="drop",
         seed=params.seed,
+        checkpointInterval=params.checkpoint_interval,
     )
     return als.fit(to_ratings(interactions))
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import tempfile
 import time
 from pathlib import Path
@@ -63,6 +64,7 @@ def run(train: DataFrame, test: DataFrame, params: als.ALSParams = als.ALSParams
     interactions = interaction_scores(train).cache()
     matrix = filter_rare(interactions).cache()
     data = {"interactions": matrix_stats(interactions), "als_matrix": matrix_stats(matrix)}
+    interactions.unpersist()    # only the filtered matrix is used from here on
     timings["interactions"] = round(time.time() - started, 1)
 
     truth_all = ground_truth(test, truth_events)
@@ -153,6 +155,8 @@ def main() -> None:
     p.add_argument("--alpha", type=float, default=defaults.alpha)
     p.add_argument("--iter", type=int, default=defaults.max_iter)
     p.add_argument("--seed", type=int, default=defaults.seed)
+    p.add_argument("--checkpoint-interval", type=int, default=defaults.checkpoint_interval,
+                   help="ALS: save factors every N iterations so old shuffle files can be deleted")
     p.add_argument("--model-out", help="also save the ALS model here (used by sim:item)")
     p.add_argument("--knn-neighbours", type=int, default=knn_defaults.neighbours)
     p.add_argument("--knn-max-items", type=int, default=knn_defaults.max_items_per_user,
@@ -163,11 +167,12 @@ def main() -> None:
 
     spark = get_spark("batch-eval", s3=not args.no_s3)
     spark.sparkContext.setLogLevel("WARN")
-    # ALS checkpoints its factors every 10 iterations when a checkpoint dir is set.
-    spark.sparkContext.setCheckpointDir(tempfile.mkdtemp(prefix="als-checkpoint-"))
+    # ALS checkpoints its factors every --checkpoint-interval iterations into this dir.
+    checkpoint_dir = tempfile.mkdtemp(prefix="als-checkpoint-")
+    spark.sparkContext.setCheckpointDir(checkpoint_dir)
     train, test = load_split(spark, args.input)
     params = als.ALSParams(rank=args.rank, reg_param=args.reg, alpha=args.alpha,
-                           max_iter=args.iter, seed=args.seed)
+                           max_iter=args.iter, seed=args.seed, checkpoint_interval=args.checkpoint_interval)
     knn_params = item_knn.KNNParams(neighbours=args.knn_neighbours, max_items_per_user=args.knn_max_items,
                                     min_common_users=args.knn_min_common)
     result = run(train, test, params, args.eval_users, tuple(args.truth_events), model_out=args.model_out,
@@ -180,6 +185,7 @@ def main() -> None:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     spark.stop()
+    shutil.rmtree(checkpoint_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
