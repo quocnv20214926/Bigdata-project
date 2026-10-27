@@ -47,6 +47,7 @@ STEPS = ("check", "popularity", "train", "recommend", "sim", "load", "validate",
 # sim:item source. Item-kNN won every quality measure of the week 4 comparison
 # (docs/week-04.md); the ALS factor table is kept for the similarity ablation.
 SIM_SOURCES = ("item_knn", "als")
+POP_TOP_N = 100     # products in pop:global and each pop:cat, whatever batch_top_n (rec:batch) is
 DEFAULT_ROOT = os.getenv("BATCH_ROOT", "s3a://lake/batch/")
 DEFAULT_STATS_DIR = os.getenv("BATCH_STATS_DIR", "data/batch-runs")
 
@@ -208,7 +209,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--iter", type=int, default=d.max_iter)
     p.add_argument("--top-n", type=int, default=settings.batch_top_n, help="products per user in rec:batch")
     p.add_argument("--max-users", type=int, default=0, help="rec:batch users, 0 = as many as the budget allows")
-    p.add_argument("--pop-n", type=int, default=settings.batch_top_n, help="products in pop:global and each pop:cat")
+    p.add_argument("--pop-n", type=int, default=POP_TOP_N, help="products in pop:global and each pop:cat")
     p.add_argument("--sim-source", choices=SIM_SOURCES, default=SIM_SOURCES[0], help="where sim:item comes from")
     p.add_argument("--sim-block-size", type=int, default=sim_item.DEFAULT_BLOCK_SIZE, help="--sim-source als only")
     p.add_argument("--redis-host", default=settings.redis_host)
