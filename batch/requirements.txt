@@ -2,3 +2,4 @@ pyspark==3.5.9
 numpy>=1.21              # required by pyspark.ml (ALS) and batch/sim_item.py
 pandas>=2.0,<3           # mapInPandas in batch/sim_item.py (PySpark 3.5 targets pandas 2)
 pyarrow>=12
+redis>=5                 # Redis loader and sizing
