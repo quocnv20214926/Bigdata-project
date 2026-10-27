@@ -29,3 +29,10 @@ key = rk.rec_batch(541312140)             # "rec:batch:541312140"
 event = Event.from_json(kafka_message)    # parse a Kafka value
 top = merge_scores(batch, realtime, k=10) # [(product_id, score, source), ...]
 ```
+
+## Changes
+
+| Version | Date | Change |
+|---|---|---|
+| 1.1.0 | 2026-10-27 | `user:recent` and `user:bought` are ZSETs scored by event time (epoch seconds), matching `streaming/main.py`; they were LIST and SET |
+| 1.0.0 | Week 2 | Contracts frozen by both pairs |

@@ -64,8 +64,8 @@ Each key has exactly one writer pipeline. The authoritative definition is `commo
 | `sim:item:{product_id}` | ZSET | Batch | Overwritten nightly | top-50 product → cosine similarity |
 | `pop:cat:{category_id}`, `pop:global` | ZSET | Batch | Overwritten nightly | product → long-term popularity |
 | `meta:batch:last_run` | STRING | Batch | none | timestamp of last load |
-| `user:recent:{user_id}` | LIST | Speed | 24h | last 20 events, `product_id\|event_type\|epoch` |
-| `user:bought:{user_id}` | SET | Speed | 30 days | purchased products |
+| `user:recent:{user_id}` | ZSET | Speed | 24h | last 20 events, member `product_id\|event_type\|epoch`, score = epoch |
+| `user:bought:{user_id}` | ZSET | Speed | 30 days | purchased products, score = purchase epoch |
 | `rec:rt:{user_id}` | ZSET | Speed | 6h | product → real-time score |
 | `sim:cooc:{product_id}` | ZSET | Speed | 7 days | top-50 product → normalized co-occurrence |
 | `trend:cat:{category_id}`, `trend:global` | ZSET | Speed | 1h | product → weighted count in last hour |
