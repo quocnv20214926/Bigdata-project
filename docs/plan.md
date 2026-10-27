@@ -163,9 +163,9 @@ The team works in 2 fixed pairs, each owning one pipeline. The detailed weekly a
 ### Week 1: Project Setup
 - [x] Create repository structure, README, and plan
 - [x] Draft shared contracts in `common/`
-- [ ] Write the three Docker Compose files in `infra/`
-- [ ] Download the dataset into `data/raw/`, verify columns and event types
-- [ ] Initialize the git repository
+- [x] Write the three Docker Compose files in `infra/`
+- [x] Download the dataset into `data/raw/`, verify columns and event types
+- [x] Initialize the git repository
 
 ### Weeks 2–10: Summary
 

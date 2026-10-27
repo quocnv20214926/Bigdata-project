@@ -6,7 +6,7 @@ Protocol (details in evaluation/README.md):
   - ground truth = distinct products each user interacted with in the test period
     (--truth-events, default every event type)
   - evaluated users = users with ground truth who are in the filtered ALS matrix,
-    a deterministic sample of --eval-users of them; both models score the same users
+    a deterministic sample of --eval-users of them; all models score the same users
 
 Usage (from the repository root):
   SPARK_DRIVER_MEMORY=14g python -m evaluation.offline --report docs/eval-week03.json
