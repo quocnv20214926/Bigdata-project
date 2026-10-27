@@ -18,7 +18,7 @@ evaluated on the test split next to the Popularity baseline (evaluation.offline.
 --model-out saves that model (used by sim:item).
 
 Usage (from the repository root, MinIO running):
-  SPARK_DRIVER_MEMORY=14g python -m evaluation.tune_als --report docs/tune-als-week04.json \\
+  SPARK_DRIVER_MEMORY=14g python -m evaluation.tune_als --report docs/eval-week04-tuning.json \\
       --final-report docs/eval-week04-als.json --model-out s3a://lake/models/als/week4/
   python -m evaluation.tune_als --search grid --alphas 5 10 --regs 0.1 --ranks 32 64
 """
