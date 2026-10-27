@@ -1,16 +1,18 @@
 # Batch pipeline services (owner: Pair 1).
 # Must be combined with compose.base.yml (Redis, MinIO live there):
 #
-#   docker compose --profile lake -f infra/compose.base.yml -f infra/compose.batch.yml up -d
+#   docker compose --profile lake -f infra/compose.base.yml -f infra/compose.batch.yml up -d --build
 #
 # Host ports:
-#   7077  Spark master (spark://localhost:7077)
-#   8090  Spark master UI
-#   8091  Spark worker UI
 #   8080  Airflow web UI (user "admin", password printed in `docker compose logs airflow`)
+#   7077  Spark master (spark://localhost:7077)   } only with --profile spark-cluster
+#   8090  Spark master UI, 8091 Spark worker UI   }
 #
-# Code is mounted, not baked into images, so edits in batch/ and common/ are picked up
-# without a rebuild. Spark jobs reach MinIO through s3a://; add the Hadoop AWS jars at submit time:
+# The nightly DAG (batch/dags/nightly_batch.py) runs Spark in local mode inside the Airflow
+# container (image: infra/airflow/Dockerfile), so the standalone cluster is optional and off by
+# default; it costs memory a laptop's Docker VM does not have. Code is mounted, not baked into
+# images, so edits in batch/, evaluation/ and common/ are picked up without a rebuild.
+# Spark jobs reach MinIO through s3a://; outside the Airflow image add the Hadoop AWS jars at submit time:
 #   --packages org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262
 
 x-spark-env: &spark-env
@@ -25,6 +27,7 @@ x-spark-env: &spark-env
 
 x-spark-volumes: &spark-volumes
   - ../batch:/opt/project/batch
+  - ../evaluation:/opt/project/evaluation
   - ../common:/opt/project/common:ro
   - ../data:/opt/project/data
 
@@ -32,6 +35,7 @@ services:
   spark-master:
     image: ${SPARK_IMAGE:-apache/spark:3.5.3}
     container_name: spark-master
+    profiles: ["spark-cluster"]
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
     environment:
       <<: *spark-env
@@ -50,6 +54,7 @@ services:
   spark-worker:
     image: ${SPARK_IMAGE:-apache/spark:3.5.3}
     container_name: spark-worker
+    profiles: ["spark-cluster"]
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
     depends_on:
       spark-master:
@@ -63,27 +68,38 @@ services:
       - "8091:8081"
     volumes: *spark-volumes
 
-  # Orchestration of the nightly batch (DAG `nightly_batch`, week 5).
-  # `airflow standalone` = scheduler + webserver + SQLite metadata DB in one container,
-  # enough for a single-machine demo. DAG files live in batch/dags/.
+  # Orchestration of the nightly batch (DAG `nightly_batch`, batch/dags/).
+  # `airflow standalone` = scheduler + webserver + SQLite metadata DB in one container, enough for
+  # a single-machine demo; with SQLite the tasks run one at a time, which also bounds the memory.
   airflow:
-    image: ${AIRFLOW_IMAGE:-apache/airflow:2.10.5-python3.11}
+    build:
+      context: ..
+      dockerfile: infra/airflow/Dockerfile
+    image: recsys/airflow-batch:2.10.5
     container_name: airflow
     command: standalone
     depends_on:
-      spark-master:
-        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
       <<: *spark-env
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_FOLDER: /opt/project/batch/dags
-      SPARK_MASTER_URL: spark://spark-master:7077
+      # local[*] inside this container; spark://spark-master:7077 needs --profile spark-cluster and
+      # workers with the same Python packages as this image.
+      SPARK_MASTER_URL: ${NIGHTLY_SPARK_MASTER:-local[*]}
+      # The full data needs ~14g (run it on the host, batch/README.md), more than a laptop's
+      # Docker VM has, so the default DAG params below (batch/dags/nightly_batch.py) are a short
+      # window and fewer users; 0 and 0 = all the data and as many users as the Redis budget allows.
+      SPARK_DRIVER_MEMORY: ${NIGHTLY_DRIVER_MEMORY:-4g}
+      NIGHTLY_TRAIN_DAYS: ${NIGHTLY_TRAIN_DAYS:-7}
+      NIGHTLY_MAX_USERS: ${NIGHTLY_MAX_USERS:-50000}
+      BATCH_ROOT: ${BATCH_ROOT:-s3a://lake/batch/}
     ports:
       - "8080:8080"
     volumes:
       - ../batch:/opt/project/batch
+      - ../evaluation:/opt/project/evaluation
       - ../common:/opt/project/common:ro
       - ../data:/opt/project/data
       - airflow-home:/opt/airflow
