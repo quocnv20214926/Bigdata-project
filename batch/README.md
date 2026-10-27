@@ -10,6 +10,7 @@ Raw REES46 CSV -> clean Parquet -> ALS -> Redis. Code here follows the contracts
 | `interactions.py` | Interaction matrix: summed event weights per (user, product); ALS filter (product >= 5 users, then user >= 2 products) |
 | `popularity.py` | Long-term popularity: Popularity baseline, and the lists for `pop:global` / `pop:cat` |
 | `als.py` | Implicit ALS (Spark MLlib) trained on `log(1 + score)`, so its confidence equals `common.weights.als_confidence` |
+| `item_knn.py` | Item-kNN baseline: cosine between product vectors over users (`log(1 + score)`), top 50 neighbours per product |
 | `tests/` | Unit tests on tiny data (local Spark, no MinIO needed) |
 
 ## Setup
@@ -22,6 +23,11 @@ pip install -r batch/requirements.txt pandas pyarrow pytest
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)    # macOS
 python -m pytest batch/tests evaluation/tests -q
 ```
+
+`java_home -v 17` silently falls back to another version when no Java 17 is registered
+(check with `/usr/libexec/java_home -V`). With Homebrew's `openjdk@17` on Apple silicon, use
+`export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home` instead.
+"Java gateway process exited before sending its port number" usually means a wrong `JAVA_HOME`.
 
 ## Run the ETL
 
@@ -66,7 +72,7 @@ spark = get_spark("als")
 train, test = load_split(spark)    # reads s3a://lake/clean/events/
 ```
 
-## Train and evaluate (Popularity vs ALS)
+## Train and evaluate (Popularity, Item-kNN, ALS)
 
 ```bash
 # MinIO must be running and hold s3a://lake/clean/events/ (see "Run the ETL")
@@ -74,6 +80,9 @@ SPARK_DRIVER_MEMORY=14g python -m evaluation.offline --report docs/eval-week03.j
 
 # Faster first run: fewer evaluated users, smaller model
 SPARK_DRIVER_MEMORY=14g python -m evaluation.offline --eval-users 20000 --rank 32 --iter 5
+
+# Only some of the models
+SPARK_DRIVER_MEMORY=14g python -m evaluation.offline --models popularity item_knn --eval-users 20000
 ```
 
 The protocol and the metric definitions are in [`evaluation/README.md`](../evaluation/README.md).

@@ -74,8 +74,14 @@ def test_offline_run_end_to_end(spark):
 
     assert report["data"]["ground_truth"] == {"users": 40, "pairs": 40}
     assert report["data"]["als_matrix"]["users"] == 40          # users 41-60 have 1 product each
-    pop, als_ = report["results"]["popularity"], report["results"]["als"]
-    assert pop["users"] == als_["users"] == 40
+    pop, knn, als_ = (report["results"][m] for m in ("popularity", "item_knn", "als"))
+    assert pop["users"] == knn["users"] == als_["users"] == 40
     assert pop["hit_rate@1"] == 0.0                              # everyone gets product 300 first
     assert als_["hit_rate@5"] > pop["hit_rate@5"]
-    assert "| als |" in format_table(report["results"])
+    # the skipped product is a neighbour of all 4 viewed ones, each viewed one of only 3 others
+    assert knn["hit_rate@1"] == 1.0
+    assert report["data"]["item_knn"] == {"similarities": 40, "products": 10}
+    assert "| item_knn |" in format_table(report["results"])
+
+    only = run(train, test, ALSParams(rank=4, max_iter=2), eval_users=0, ks=(1,), models=("popularity",))
+    assert list(only["results"]) == ["popularity"] and only["protocol"]["models"] == ["popularity"]

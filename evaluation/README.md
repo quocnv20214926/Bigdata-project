@@ -5,7 +5,7 @@ Compares recommendation models on the time-based split. Code follows the contrac
 | File | Purpose |
 |---|---|
 | `metrics.py` | Precision, Recall, Hit Rate, NDCG at k (plain Python for one user, Spark for many) and catalog coverage |
-| `offline.py` | Runner: interaction matrix, Popularity baseline, implicit ALS, metrics, JSON report |
+| `offline.py` | Runner: interaction matrix, Popularity and Item-kNN baselines, implicit ALS, metrics, JSON report |
 | `tests/` | Metric checks against hand-computed values, and an end-to-end run on tiny data |
 
 ## Protocol
@@ -13,6 +13,8 @@ Compares recommendation models on the time-based split. Code follows the contrac
 | Item | Choice |
 |---|---|
 | Split | train = 2019-10-01 .. 11-15, test = 11-16 .. 11-30 (`batch/split.py`) |
+| Models | Popularity (global top-k by summed event weights, same list for every user); Item-kNN (`batch/item_knn.py`); implicit ALS (`batch/als.py`). Item-kNN and ALS use the same filtered matrix |
+| Item-kNN | cosine between product vectors over users, r = log(1 + score); top 50 neighbours per product sharing >= 2 users; each user's 50 strongest products enter the similarity; score(u, j) = sum of r(u, i) * sim(i, j) over the user's products |
 | Ground truth | distinct products a user interacted with in the test period; `--truth-events cart purchase` keeps purchase intent only |
 | Evaluated users | users with ground truth who are in the filtered ALS matrix (warm users); a deterministic sample of `--eval-users` (default 100,000); both models score the same users |
 | Relevance | binary: a recommended product is relevant if it is in the ground truth |
@@ -34,5 +36,6 @@ python -m evaluation.offline --input data/clean/events --no-s3 --eval-users 2000
 python -m pytest evaluation/tests -q
 ```
 
-ALS options: `--rank`, `--reg`, `--alpha`, `--iter`, `--seed`. The report records the protocol,
-ALS parameters, matrix sizes, metrics and the time of each step.
+ALS options: `--rank`, `--reg`, `--alpha`, `--iter`, `--seed`. Item-kNN options: `--knn-neighbours`,
+`--knn-max-items`, `--knn-min-common`. `--models` picks a subset of `popularity item_knn als`.
+The report records the protocol, the parameters, matrix sizes, metrics and the time of each step.
