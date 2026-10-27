@@ -7,7 +7,10 @@ Raw REES46 CSV -> clean Parquet -> ALS -> Redis. Code here follows the contracts
 | `spark_session.py` | `get_spark()`: local or cluster SparkSession, MinIO over `s3a://` (settings from `common/config.py`) |
 | `etl.py` | Raw CSV -> clean Parquet partitioned by `event_date`, with a validation report |
 | `split.py` | Time-based split: train 2019-10-01 .. 11-15, test 11-16 .. 11-30 (`load_split()`) |
-| `tests/` | Unit tests on a tiny CSV (local Spark, no MinIO needed) |
+| `interactions.py` | Interaction matrix: summed event weights per (user, product); ALS filter (product >= 5 users, then user >= 2 products) |
+| `popularity.py` | Long-term popularity: Popularity baseline, and the lists for `pop:global` / `pop:cat` |
+| `als.py` | Implicit ALS (Spark MLlib) trained on `log(1 + score)`, so its confidence equals `common.weights.als_confidence` |
+| `tests/` | Unit tests on tiny data (local Spark, no MinIO needed) |
 
 ## Setup
 
@@ -17,7 +20,7 @@ PySpark needs Java 17. From the repository root:
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r batch/requirements.txt pandas pyarrow pytest
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)    # macOS
-python -m pytest batch/tests -q
+python -m pytest batch/tests evaluation/tests -q
 ```
 
 ## Run the ETL
@@ -62,3 +65,16 @@ from batch.split import load_split
 spark = get_spark("als")
 train, test = load_split(spark)    # reads s3a://lake/clean/events/
 ```
+
+## Train and evaluate (Popularity vs ALS)
+
+```bash
+# MinIO must be running and hold s3a://lake/clean/events/ (see "Run the ETL")
+SPARK_DRIVER_MEMORY=14g python -m evaluation.offline --report docs/eval-week03.json
+
+# Faster first run: fewer evaluated users, smaller model
+SPARK_DRIVER_MEMORY=14g python -m evaluation.offline --eval-users 20000 --rank 32 --iter 5
+```
+
+The protocol and the metric definitions are in [`evaluation/README.md`](../evaluation/README.md).
+`--model-out s3a://lake/models/als/` also saves the model for `sim:item`.
