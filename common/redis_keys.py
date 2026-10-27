@@ -7,12 +7,16 @@
 | pop:cat:{category_id}       | ZSET   | Pair 1 batch  | none (nightly)   | product_id -> long-term popularity     |
 | pop:global                  | ZSET   | Pair 1 batch  | none (nightly)   | product_id -> long-term popularity     |
 | meta:batch:last_run         | STRING | Pair 1 batch  | none             | ISO 8601 UTC timestamp of last load    |
-| user:recent:{user_id}       | LIST   | Pair 2 speed  | 24h              | "product_id|event_type|epoch_seconds"  |
-| user:bought:{user_id}       | SET    | Pair 2 speed  | 30 days          | product_id                             |
+| user:recent:{user_id}       | ZSET   | Pair 2 speed  | 24h              | "product_id|event_type|epoch" -> epoch |
+| user:bought:{user_id}       | ZSET   | Pair 2 speed  | 30 days          | product_id -> purchase epoch_seconds   |
 | rec:rt:{user_id}            | ZSET   | Pair 2 speed  | 6h               | product_id -> real-time score          |
 | sim:cooc:{product_id}       | ZSET   | Pair 2 speed  | 7 days           | product_id -> normalized co-occurrence |
 | trend:cat:{category_id}     | ZSET   | Pair 2 speed  | 1h               | product_id -> weighted count (1h)      |
 | trend:global                | ZSET   | Pair 2 speed  | 1h               | product_id -> weighted count (1h)      |
+
+user:recent keeps only the settings.recent_n newest members (ZREMRANGEBYRANK
+after each write); read it newest first with ZREVRANGE. user:bought is checked
+with ZSCORE (purchased if not nil). Both were LIST / SET before contract 1.1.0.
 
 Each key has exactly one writer pipeline, so the two pairs never overwrite
 each other. Pair 2 may keep internal helper keys under the "rt:" prefix
