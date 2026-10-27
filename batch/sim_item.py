@@ -1,4 +1,8 @@
-"""sim:item: the most similar products by cosine between ALS item factors (Pair 1, week 4).
+"""The most similar products by cosine between ALS item factors (Pair 1, week 4).
+
+This was the week 4 candidate for sim:item. Item-kNN (batch/item_knn.py) won the comparison
+(docs/week-04.md), so the nightly job loads that table and uses this one only with
+`--sim-source als` (similarity ablation).
 
   sim(i, j) = f_i . f_j / (||f_i|| * ||f_j||)    for the item factors f of batch/als.py
 

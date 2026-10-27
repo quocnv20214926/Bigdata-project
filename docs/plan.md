@@ -34,8 +34,8 @@ The system is built as **two independent pipelines** that both read the raw data
 ```
                 ┌──────────────── BATCH PIPELINE (Pair 1, nightly, Airflow) ──────────┐
            ┌──► │ S3/MinIO (raw) → PySpark ETL → Parquet (clean, by date)             │
-           │    │   ├─ Implicit ALS → rec:batch (top-100 per user)                    │
-           │    │   ├─ Item-item similarity on ALS factors → sim:item                 │
+           │    │   ├─ Implicit ALS → rec:batch (most recently active users)          │
+           │    │   ├─ Item-kNN similarity (cosine over users) → sim:item             │
            │    │   └─ Long-term popularity → pop:cat, pop:global                     │
            │    └───────────────────────────────┬─────────────────────────────────────┘
 REES46 CSV │                                    ▼ (bulk load)
@@ -74,10 +74,10 @@ Each key has exactly one writer pipeline. The authoritative definition is `commo
 
 | | `sim:cooc` (speed) | `sim:item` (batch) |
 |---|---|---|
-| Method | Count of products viewed in the same session (within the last 10 items), normalized: `cooc(i, j) / sqrt(cnt(i) · cnt(j))` | Cosine similarity between ALS item factors |
+| Method | Count of products viewed in the same session (within the last 10 items), normalized: `cooc(i, j) / sqrt(cnt(i) · cnt(j))` | Cosine between products over the users who interacted with them in the training window (Item-kNN, weights `log(1 + score)`, at least 2 users in common). Chosen in week 4 over the cosine of ALS item factors, which scored lower on every measure ([week-04.md](week-04.md)) |
 | Update | Continuously, per event | Nightly |
-| Strength | Simple; captures new products and trends immediately | Learns latent relations between products never viewed together |
-| Weakness | Noisy for rarely viewed products; only direct relations | New products wait for the next training run |
+| Strength | Simple; captures new products and trends immediately | Uses each user's whole history, so it links products seen in different sessions or weeks apart |
+| Weakness | Noisy for rarely viewed products; only direct relations | New products wait for the next nightly run; products sharing fewer than 2 users with any other get no list |
 
 The speed layer uses `sim:cooc` by default, so it does not depend on the batch layer. After integration, `sim:item` is added and the three variants (cooc / item / hybrid) are compared.
 

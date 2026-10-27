@@ -10,11 +10,14 @@ Raw REES46 CSV -> clean Parquet -> ALS -> Redis. Code here follows the contracts
 | `interactions.py` | Interaction matrix: summed event weights per (user, product); ALS filter (product >= 5 users, then user >= 2 products) |
 | `popularity.py` | Long-term popularity: Popularity baseline, and the lists for `pop:global` / `pop:cat` |
 | `als.py` | Implicit ALS (Spark MLlib) trained on `log(1 + score)`, so its confidence equals `common.weights.als_confidence` |
-| `item_knn.py` | Item-kNN baseline: cosine between product vectors over users (`log(1 + score)`), top 50 neighbours per product |
-| `sim_item.py` | `sim:item`: exact cosine top-50 between ALS item factors (broadcast factors, numpy block product per task) |
+| `item_knn.py` | Item-kNN: cosine between product vectors over users (`log(1 + score)`), top 50 neighbours per product; baseline, and the `sim:item` table since week 5 |
+| `sim_item.py` | Exact cosine top-50 between ALS item factors (broadcast factors, numpy block product per task); the week 4 `sim:item` candidate, kept for the ablation |
 | `rec_batch.py` | Redis budget of the batch keys (1 GiB) and which users get `rec:batch` (most recently active ALS users that fit) |
 | `redis_sizing.py` | Measures Redis memory per key on a live Redis; validation-week coverage of top-50 vs top-100 |
-| `tests/` | Unit tests on tiny data (local Spark, no MinIO needed) |
+| `redis_loader.py` | Bulk loader: `pop:*`, `sim:item`, `rec:batch` from Spark, budget check, stale keys removed, `meta:batch:last_run` last |
+| `nightly.py` | The nightly batch as separate steps (check, popularity, train, recommend, sim, load, validate, cleanup) |
+| `dags/nightly_batch.py` | Airflow DAG `nightly_batch` running those steps every night at 02:00 UTC |
+| `tests/` | Unit tests on tiny data (local Spark, no MinIO needed; the Redis tests use database 15 of a local Redis if there is one) |
 
 ## Setup
 
@@ -25,6 +28,7 @@ python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r batch/requirements.txt pytest
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)    # macOS
 python -m pytest batch/tests evaluation/tests -q
+# Redis tests: REDIS_TEST_PORT=6379 (default) uses database 15 and skips if it is not empty
 ```
 
 `java_home -v 17` silently falls back to another version when no Java 17 is registered
@@ -106,3 +110,49 @@ SPARK_DRIVER_MEMORY=14g python -m evaluation.similarity --model s3a://lake/model
 # How big rec:batch can be (Redis from infra/compose.base.yml must be running)
 python -m batch.redis_sizing --report docs/redis-sizing-week04.json
 ```
+
+## Nightly batch and Redis (week 5)
+
+Each step of `batch/nightly.py` is one command. They share their tables under
+`s3a://lake/batch/<run-id>/` and only use events before `--as-of` (default 2019-11-16, the first
+day Pair 2 replays), so the same commands run by hand on the host and as Airflow tasks:
+
+```bash
+run=$(date -u +%Y%m%dT%H%M%S)      # same form as the Airflow run ids, so cleanup keeps the newest
+for step in check popularity train recommend sim load validate cleanup; do
+  SPARK_DRIVER_MEMORY=14g python -m batch.nightly $step --run-id $run || break
+done
+```
+
+What lands in Redis (keys from `common/redis_keys.py`, scores rounded to 4 decimals):
+
+| Key | Content | Size |
+|---|---|---|
+| `rec:batch:{user_id}` | top `batch_top_n` ALS products for the most recently active ALS users | as many users as fit 860 MiB |
+| `sim:item:{product_id}` | top 50 Item-kNN neighbours (cosine over users, at least 2 users in common); `--sim-source als` for the ALS factor table | about 90 MB |
+| `pop:global`, `pop:cat:{category_id}` | top 100 products by summed event weights | a few MB |
+| `meta:batch:last_run` | ISO 8601 UTC time of the load, written last | |
+
+The loader refuses to write when a family would pass its budget in `batch/rec_batch.py`: batch
+keys have no TTL, and Redis (`volatile-lru`) never evicts them.
+
+### Airflow
+
+```bash
+docker compose --profile lake -f infra/compose.base.yml -f infra/compose.batch.yml up -d --build
+docker compose -f infra/compose.base.yml -f infra/compose.batch.yml logs airflow | grep -i password
+docker exec airflow airflow dags unpause nightly_batch     # starts the latest 02:00 run at once
+# or http://localhost:8080 -> nightly_batch -> Trigger DAG w/ config, or:
+docker exec airflow airflow dags trigger nightly_batch -c '{"train_days": 14, "max_users": 50000}'
+docker exec airflow python -m pytest /opt/project/batch/tests/test_dag.py -q -p no:cacheprovider
+```
+
+The image (`infra/airflow/Dockerfile`) adds Java 17, PySpark and the s3a jars to Airflow; Spark runs
+in local mode inside the container with `NIGHTLY_DRIVER_MEMORY` (default 4g). A full run needs a
+14 GB driver, more than a laptop's Docker VM usually has, so in Docker the DAG defaults to the last
+`NIGHTLY_TRAIN_DAYS` (7) days and `NIGHTLY_MAX_USERS` (50000) users. Run the commands above on the
+host for the full data, or set `NIGHTLY_TRAIN_DAYS=0 NIGHTLY_MAX_USERS=0 NIGHTLY_DRIVER_MEMORY=14g`
+on a machine that has the memory. Stop the container (`docker compose ... stop airflow`) after a
+demo, otherwise its 02:00 run replaces what a full host run loaded. Run ids are the logical time
+(`ts_nodash`, e.g. `20261028T020000`); task logs are in the Airflow UI and each step's summary is
+written to `data/batch-runs/<run-id>/<step>.json`.
