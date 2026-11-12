@@ -4,6 +4,7 @@ User 515425546
   history before 2019-11-16: 129 events, 78 products (view 126, cart 3)
   test period 2019-11-16..2019-11-30: 89 events, 55 products (view 85, cart 3, purchase 1)
   rec:batch: yes
+  popularity list: pop:cat:2053013552863641845 (main category of the history)
   latest history events, UTC (newest first, up to 8):
     2019-11-15 14:18  view       7006333  carriage                          77.04
     2019-11-14 20:26  view      28715563  adidas keds                       75.03
@@ -14,7 +15,7 @@ User 515425546
     2019-11-14 20:23  view      52500149  nike shoes                        46.33
     2019-11-14 20:22  view      52500143  nike shoes                        46.33
 
-   #  ALS                                 Item-kNN                            Popularity (pop:cat:20530135528636
+   #  ALS                                 Item-kNN                            Popularity
    1   55000008 nike costume           *    7300194 transcend              *    7300440 transcend
    2    4804718 apple headphone        *    7300209 transcend              *    7300464 apacer
    3    4804056 apple headphone        *    7300208 transcend              *    7300020 transcend              *
@@ -33,6 +34,7 @@ User 515813436
   history before 2019-11-16: 142 events, 61 products (view 132, cart 10)
   test period 2019-11-16..2019-11-30: 59 events, 8 products (view 45, cart 14)
   rec:batch: yes
+  popularity list: pop:cat:2053013555631882655 (main category of the history)
   latest history events, UTC (newest first, up to 8):
     2019-11-15 19:05  cart       1005116  apple smartphone                 994.34
     2019-11-15 19:05  view       1005116  apple smartphone                 994.34
@@ -43,7 +45,7 @@ User 515813436
     2019-11-15 19:01  view       1004226  apple smartphone                 952.15
     2019-11-15 19:00  view       1005116  apple smartphone                 994.34
 
-   #  ALS                                 Item-kNN                            Popularity (pop:cat:20530135556318
+   #  ALS                                 Item-kNN                            Popularity
    1    1004246 apple smartphone       *    1004249 apple smartphone      C*    1004856 samsung smartphone
    2    1005116 apple smartphone      C*    1005115 apple smartphone      C*    1004767 samsung smartphone     *
    3    1004250 apple smartphone      C*    1003317 apple smartphone      V*    1005115 apple smartphone      C*
@@ -62,6 +64,7 @@ User 563535197
   history before 2019-11-16: 26 events, 13 products (view 26)
   test period 2019-11-16..2019-11-30: 9 events, 3 products (view 6, cart 3)
   rec:batch: yes
+  popularity list: pop:cat:2053013555262783879 (main category of the history)
   latest history events, UTC (newest first, up to 8):
     2019-11-14 16:11  view       3100074  braun blender                     74.62
     2019-11-14 16:11  view       3100251  braun blender                     82.34
@@ -72,7 +75,7 @@ User 563535197
     2019-11-14 15:43  view       3100074  braun blender                     74.62
     2019-11-14 15:30  view       3100074  braun blender                     74.62
 
-   #  ALS                                 Item-kNN                            Popularity (pop:cat:20530135552627
+   #  ALS                                 Item-kNN                            Popularity
    1    3100640 redmond blender        *    3100034 braun blender          *    3100640 redmond blender        *
    2    3100034 braun blender          *    3100439 braun blender               3100267 vitek blender
    3    3100491 polaris blender             3100970 redmond blender             3100491 polaris blender
@@ -89,12 +92,13 @@ User 563535197
 
 User 573026457
   history before 2019-11-16: 0 events, 0 products
-  test period 2019-11-16..2019-11-30: 5 events, 1 products (view 4, cart 1)
+  test period 2019-11-16..2019-11-30: 5 events, 1 product (view 4, cart 1)
   rec:batch: no (the API falls back to popularity)
+  popularity list: pop:global
   latest history events, UTC (newest first, up to 8):
     (none: a new user)
 
-   #  ALS                                 Item-kNN                            Popularity (pop:global)
+   #  ALS                                 Item-kNN                            Popularity
    1                                                                            1004856 samsung smartphone
    2                                                                            1004767 samsung smartphone
    3                                                                            1005115 apple smartphone
