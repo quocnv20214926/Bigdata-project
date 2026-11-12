@@ -17,6 +17,7 @@ Raw REES46 CSV -> clean Parquet -> ALS -> Redis. Code here follows the contracts
 | `redis_loader.py` | Bulk loader: `pop:*`, `sim:item`, `rec:batch` from Spark, budget check, stale keys removed, `meta:batch:last_run` last |
 | `nightly.py` | The nightly batch as separate steps (check, popularity, train, recommend, sim, load, validate, cleanup) |
 | `dags/nightly_batch.py` | Airflow DAG `nightly_batch` running those steps every night at 02:00 UTC |
+| `demo_recommend.py` | Demo: a user's history and the ALS, Item-kNN and Popularity top 10 read from Redis, with the test-period hits marked |
 | `tests/` | Unit tests on tiny data (local Spark, no MinIO needed; the Redis tests use database 15 of a local Redis if there is one) |
 
 ## Setup
@@ -156,3 +157,33 @@ on a machine that has the memory. Stop the container (`docker compose ... stop a
 demo, otherwise its 02:00 run replaces what a full host run loaded. Run ids are the logical time
 (`ts_nodash`, e.g. `20261028T020000`); task logs are in the Airflow UI and each step's summary is
 written to `data/batch-runs/<run-id>/<step>.json`.
+
+## Faster recommend and the batch demo (week 6)
+
+`recommend` scores users with numpy instead of `recommendForUserSubset`: the product factors are
+broadcast once, each Spark task multiplies blocks of 128 users by them and keeps the top k with
+`argpartition` (`als.recommend`; the old path stays as `als.recommend_builtin`, and a test checks both
+give the same lists). `train` now also saves the filtered interaction matrix (`matrix/`), so `sim`
+reuses it instead of rebuilding it from the events. Knobs for the timing experiments:
+
+```bash
+python -m batch.nightly train --run-id $run --iter 8 --als-blocks 20 --checkpoint-interval 4
+SPARK_EXTRA_CONF="spark.serializer=org.apache.spark.serializer.KryoSerializer" python -m batch.nightly train --run-id $run
+```
+
+The demo reads what the last nightly run loaded into Redis and the events of the chosen users:
+
+```bash
+python -m batch.demo_recommend --pick 3                  # 3 test-period buyers that have rec:batch
+python -m batch.demo_recommend --pick-cold 1             # a buyer without rec:batch: the popularity fallback
+python -m batch.demo_recommend --user-id 512386086 --json docs/demo-week06.json
+```
+
+For each user it prints the latest history events (before `--as-of`, default 2019-11-16), then the
+three lists side by side: ALS (`rec:batch`), Item-kNN (`sim:item` of the history products, scored like
+`item_knn.py`) and Popularity (`pop:cat` of the user's main category, else `pop:global`). Products
+the user viewed, carted or purchased between `--as-of` and `--until` (default 2019-11-30) are marked
+V, C or P, and each list gets its hits and NDCG@10 against all test-period products and against the
+carted or purchased ones. The first run builds a product table (category, brand, last price) in
+`data/demo/products.parquet`, which takes one pass over the events.
+
