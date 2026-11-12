@@ -32,6 +32,7 @@ import time
 from pathlib import Path
 
 import pandas as pd
+from pyspark import StorageLevel
 from pyspark.sql import DataFrame, Window, functions as F
 
 from batch import als, item_knn
@@ -127,12 +128,16 @@ def run(train: DataFrame, test: DataFrame, params: als.ALSParams = als.ALSParams
     k_max, depth = ks[-1], ks[-1] + EXTRA_DEPTH
     metric_names = [f"{m}@{k}" for k in ks for m in ("precision", "recall", "hit_rate", "ndcg")]
 
-    interactions = interaction_scores(train).cache()
+    # ALS trains first, while little else is cached: with the Popularity and Item-kNN lists of
+    # ~190,000 users in memory, rank 128 ran out of a 14 GB driver heap. The unfiltered
+    # interactions and the ground truth of every test user are read several times but are not
+    # hot, so they are kept on disk.
+    interactions = interaction_scores(train).persist(StorageLevel.DISK_ONLY)
     matrix = filter_rare(interactions).cache()
     data = {"interactions": matrix_stats(interactions), "als_matrix": matrix_stats(matrix)}
     seen = interactions.select("user_id", "product_id")
 
-    truth_all = ground_truth(test, truth_events).cache()
+    truth_all = ground_truth(test, truth_events).persist(StorageLevel.DISK_ONLY)
     truth_users = truth_all.select("user_id").distinct()
     segments = user_segments(interactions, truth_users).cache()
     data["segments"] = {r["segment"]: r["count"] for r in segments.groupBy("segment").count().collect()}
@@ -143,26 +148,35 @@ def run(train: DataFrame, test: DataFrame, params: als.ALSParams = als.ALSParams
              .where(F.col("warm") | F.col("sampled"))
              .fillna(False, ["warm", "sampled"]).cache())
     data["scored_users"] = users.count()
-    truth = {"all": truth_all.join(users, "user_id", "left_semi").cache()}
-    truth["unseen"] = truth["all"].join(seen, ["user_id", "product_id"], "left_anti").cache()
-    data["truth"] = {v: t.agg(F.countDistinct("user_id").alias("users"), F.count("*").alias("pairs"))
-                     .first().asDict() for v, t in truth.items()}
     timings["prepare"] = round(time.time() - t, 1)
 
-    t = time.time()
-    popular_top = top_global(product_popularity(train), depth).cache()
-    recs = {"popularity": recommend_popular(users, popular_top, depth).cache()}
-    sims = item_knn.similarities(matrix, knn_params).cache()
-    recs["item_knn"] = item_knn.recommend(interactions, sims, users, depth).cache()
-    data["item_knn_users"] = recs["item_knn"].select("user_id").distinct().count()
-    timings["item_knn"] = round(time.time() - t, 1)
     t = time.time()
     model = als.train(matrix, params)
     timings["als_train"] = round(time.time() - t, 1)
     t = time.time()
-    recs["als"] = als.recommend(model, users, depth).cache()
+    recs = {"als": als.recommend(model, users, depth).cache()}
     data["als_users"] = recs["als"].select("user_id").distinct().count()
+    als.release(train.sparkSession)
+    del model
     timings["als_recommend"] = round(time.time() - t, 1)
+
+    t = time.time()
+    sims = item_knn.similarities(matrix, knn_params).cache()
+    recs["item_knn"] = item_knn.recommend(interactions, sims, users, depth).cache()
+    data["item_knn_users"] = recs["item_knn"].select("user_id").distinct().count()
+    sims.unpersist()
+    matrix.unpersist()
+    timings["item_knn"] = round(time.time() - t, 1)
+
+    t = time.time()
+    popular_top = top_global(product_popularity(train), depth).cache()
+    recs["popularity"] = recommend_popular(users, popular_top, depth).cache()
+    truth = {"all": truth_all.join(users, "user_id", "left_semi").cache()}
+    truth["unseen"] = truth["all"].join(seen, ["user_id", "product_id"], "left_anti").cache()
+    data["truth"] = {v: t_.agg(F.countDistinct("user_id").alias("users"), F.count("*").alias("pairs"))
+                     .first().asDict() for v, t_ in truth.items()}
+    truth_all.unpersist()
+    timings["popularity_truth"] = round(time.time() - t, 1)
 
     t = time.time()
     frame = users.select("user_id", "segment", "train_products", "warm", "sampled").toPandas()
