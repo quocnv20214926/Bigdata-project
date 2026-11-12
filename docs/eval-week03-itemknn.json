@@ -1,0 +1,100 @@
+{
+  "protocol": {
+    "train": [
+      "2019-10-01",
+      "2019-11-15"
+    ],
+    "test": [
+      "2019-11-16",
+      "2019-11-30"
+    ],
+    "truth_events": [
+      "view",
+      "cart",
+      "purchase"
+    ],
+    "eval_users_requested": 100000,
+    "filter": {
+      "min_users_per_product": 5,
+      "min_products_per_user": 2
+    },
+    "ks": [
+      10,
+      20
+    ],
+    "models": [
+      "popularity",
+      "item_knn"
+    ]
+  },
+  "als_params": {
+    "rank": 64,
+    "reg_param": 0.1,
+    "alpha": 10.0,
+    "max_iter": 10,
+    "seed": 42
+  },
+  "knn_params": {
+    "neighbours": 50,
+    "max_items_per_user": 50,
+    "min_common_users": 2
+  },
+  "data": {
+    "interactions": {
+      "pairs": 39584014,
+      "users": 4205076,
+      "products": 191909,
+      "density": 4.905e-05
+    },
+    "als_matrix": {
+      "pairs": 38195148,
+      "users": 2890519,
+      "products": 155423,
+      "density": 8.502e-05
+    },
+    "ground_truth": {
+      "users": 100000,
+      "pairs": 1077669
+    },
+    "item_knn": {
+      "similarities": 5408264,
+      "products": 148414
+    }
+  },
+  "results": {
+    "popularity": {
+      "users": 100000,
+      "precision@10": 0.040589,
+      "recall@10": 0.076663,
+      "hit_rate@10": 0.2595,
+      "ndcg@10": 0.069064,
+      "precision@20": 0.030891,
+      "recall@20": 0.107438,
+      "hit_rate@20": 0.3165,
+      "ndcg@20": 0.076449,
+      "coverage@10": 6.4e-05
+    },
+    "item_knn": {
+      "users": 100000,
+      "precision@10": 0.060587,
+      "recall@10": 0.090303,
+      "hit_rate@10": 0.30222,
+      "ndcg@10": 0.090939,
+      "precision@20": 0.047666,
+      "recall@20": 0.136673,
+      "hit_rate@20": 0.37774,
+      "ndcg@20": 0.10167,
+      "coverage@10": 0.361201
+    }
+  },
+  "seconds": {
+    "interactions": 52.9,
+    "popularity": 0.1,
+    "item_knn_similarity": 124.2,
+    "item_knn_recommend": 23.7,
+    "evaluate_popularity": 11.5,
+    "evaluate_item_knn": 17.4,
+    "total": 235.4
+  },
+  "input": "s3a://lake/clean/events/"
+}

@@ -2,7 +2,54 @@
 
 ## Pair 1: Batch 
 
-_Written by Pair 1._
+### 1. Weekly goals
+
+- Freeze the shared contracts in `common/` with Pair 2.
+- EDA on the raw data, to choose cleaning rules and ALS filtering thresholds.
+- ETL from the raw CSV to clean Parquet on MinIO, and the time-based train/test split.
+
+### 2. Completed work
+
+| Task | Files |
+|---|---|
+| Batch services: Spark master/worker, Airflow (standalone), MinIO bucket `lake` (profile `lake`); spark-master healthcheck fixed (the master binds to the container IP, not localhost) | `infra/compose.batch.yml` |
+| EDA on full October 2019: size and sparsity, funnel, daily activity, missing values, prices, long tail, user segments, ALS filter thresholds | `notebooks/01_eda.ipynb` |
+| SparkSession factory: local or cluster, MinIO over `s3a://`, session time zone UTC | `batch/spark_session.py` |
+| ETL: raw CSV to Parquet partitioned by `event_date`; invalid rows dropped and counted by reason; empty strings to null; exact duplicates removed in the same shuffle as the date partitioning; re-running replaces only the dates in the input | `batch/etl.py` |
+| Time-based split (train Oct 1 to Nov 15, test Nov 16 to Nov 30) as a filter on the partition column, no data copy | `batch/split.py` |
+| Validation report for both months | `docs/etl-report.json` |
+| Unit tests on a tiny CSV with every edge case (4 tests) | `batch/tests/test_etl.py` |
+
+### 3. Results / metrics
+
+| Metric | Result |
+|---|---|
+| Rows read (Oct + Nov) | 109,950,743; none dropped as invalid |
+| Exact duplicates removed | 130,739 |
+| Clean rows / users / products | 109,820,004 / 5,316,649 / 206,876 |
+| ETL time (write to MinIO) | 296.5 s on a laptop, 366.1 s with the validation report |
+| Train split | 74,971,956 rows, 4,205,076 users, 191,909 products |
+| Test split | 34,848,048 rows, 2,438,946 users, 174,010 products |
+| Test users not seen in train | 1,111,573 (45.6%): cold start is common, so the popularity fallback matters |
+| Test buyers / buyers not seen in train | 302,610 / 87,440 |
+| Sparsity (October) | 3,022,290 users x 166,794 products, 99.9954% empty |
+| Event mix (October) | view 96.07%, cart 2.18%, purchase 1.75% |
+| ALS filter chosen | product >= 5 users, then user >= 2 products: keeps 76.7% of products, 67.2% of users, 95.4% of user-product pairs (October) |
+| User segments for week 7 | new <= 2 products (46.6% of users), light 3 to 10 (34.2%), heavy > 10 (19.2%) |
+
+### 4. Issues & resolutions
+
+| Issue | Resolution |
+|---|---|
+| More users purchase than add to cart (347,118 vs 337,117 in October) | ETL and scoring never assume a cart event before a purchase |
+| `category_code` empty in 31.8% and `brand` in 14.4% of rows | Kept as null; `pop:cat` uses `category_id`, which is always present |
+| 0.16% of events have price 0 | Kept (ALS does not use price); excluded only from price statistics and the UI |
+| Times shown in the machine's local time zone | Spark session time zone set to UTC; the EDA prints UTC |
+
+### 5. Plan for next week
+
+- Interaction matrix (summed event weights) with the ALS filter.
+- Metric functions, Popularity baseline, first implicit ALS model and its comparison with the baseline.
 
 ## Pair 2: Real-time 
 
