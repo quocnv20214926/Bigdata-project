@@ -1,0 +1,786 @@
+{
+  "as_of": "2019-11-16",
+  "until": "2019-11-30",
+  "k": 10,
+  "batch_last_run": "2026-11-12T05:09:54Z",
+  "users": [
+    {
+      "user_id": 515425546,
+      "history": {
+        "events": 129,
+        "products": 78
+      },
+      "test": {
+        "events": 89,
+        "products": 55,
+        "intent_products": 1
+      },
+      "has_rec_batch": true,
+      "pop_key": "pop:cat:2053013552863641845",
+      "lists": {
+        "ALS": [
+          {
+            "product_id": 55000008,
+            "score": 0.8474,
+            "label": "nike costume",
+            "test_event": null
+          },
+          {
+            "product_id": 4804718,
+            "score": 0.8293,
+            "label": "apple headphone",
+            "test_event": null
+          },
+          {
+            "product_id": 4804056,
+            "score": 0.8254,
+            "label": "apple headphone",
+            "test_event": null
+          },
+          {
+            "product_id": 52100001,
+            "score": 0.821,
+            "label": "nike",
+            "test_event": null
+          },
+          {
+            "product_id": 4804055,
+            "score": 0.7905,
+            "label": "apple headphone",
+            "test_event": null
+          },
+          {
+            "product_id": 4802036,
+            "score": 0.7266,
+            "label": "apple headphone",
+            "test_event": null
+          },
+          {
+            "product_id": 4804572,
+            "score": 0.6732,
+            "label": "apple headphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005105,
+            "score": 0.6637,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005115,
+            "score": 0.647,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005135,
+            "score": 0.6254,
+            "label": "apple smartphone",
+            "test_event": "V"
+          }
+        ],
+        "Item-kNN": [
+          {
+            "product_id": 7300194,
+            "score": 2.6704,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 7300209,
+            "score": 2.1938,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 7300208,
+            "score": 2.129,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 4804056,
+            "score": 2.105,
+            "label": "apple headphone",
+            "test_event": null
+          },
+          {
+            "product_id": 4804055,
+            "score": 1.9978,
+            "label": "apple headphone",
+            "test_event": null
+          },
+          {
+            "product_id": 7300373,
+            "score": 1.987,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 7300105,
+            "score": 1.9221,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 4804572,
+            "score": 1.7964,
+            "label": "apple headphone",
+            "test_event": null
+          },
+          {
+            "product_id": 7300284,
+            "score": 1.7794,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 7300069,
+            "score": 1.7398,
+            "label": "transcend",
+            "test_event": null
+          }
+        ],
+        "Popularity": [
+          {
+            "product_id": 7300440,
+            "score": 8431.0,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 7300464,
+            "score": 6165.0,
+            "label": "apacer",
+            "test_event": null
+          },
+          {
+            "product_id": 7300020,
+            "score": 4309.0,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 7300194,
+            "score": 2549.0,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 7300476,
+            "score": 2357.0,
+            "label": "apacer",
+            "test_event": null
+          },
+          {
+            "product_id": 7300465,
+            "score": 1833.0,
+            "label": "apacer",
+            "test_event": null
+          },
+          {
+            "product_id": 7300401,
+            "score": 1804.0,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 7300070,
+            "score": 1527.0,
+            "label": "toshiba",
+            "test_event": null
+          },
+          {
+            "product_id": 7300489,
+            "score": 1407.0,
+            "label": "transcend",
+            "test_event": null
+          },
+          {
+            "product_id": 7300212,
+            "score": 1344.0,
+            "label": "transcend",
+            "test_event": null
+          }
+        ]
+      },
+      "metrics": {
+        "ALS": {
+          "hits": 1,
+          "hit@10": 1.0,
+          "ndcg@10": 0.0636,
+          "intent_hits": 0,
+          "intent_ndcg@10": 0.0
+        },
+        "Item-kNN": {
+          "hits": 0,
+          "hit@10": 0.0,
+          "ndcg@10": 0.0,
+          "intent_hits": 0,
+          "intent_ndcg@10": 0.0
+        },
+        "Popularity": {
+          "hits": 0,
+          "hit@10": 0.0,
+          "ndcg@10": 0.0,
+          "intent_hits": 0,
+          "intent_ndcg@10": 0.0
+        }
+      }
+    },
+    {
+      "user_id": 515813436,
+      "history": {
+        "events": 142,
+        "products": 61
+      },
+      "test": {
+        "events": 59,
+        "products": 8,
+        "intent_products": 4
+      },
+      "has_rec_batch": true,
+      "pop_key": "pop:cat:2053013555631882655",
+      "lists": {
+        "ALS": [
+          {
+            "product_id": 1004246,
+            "score": 1.0021,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005116,
+            "score": 1.0017,
+            "label": "apple smartphone",
+            "test_event": "C"
+          },
+          {
+            "product_id": 1004250,
+            "score": 0.9784,
+            "label": "apple smartphone",
+            "test_event": "C"
+          },
+          {
+            "product_id": 1003316,
+            "score": 0.9623,
+            "label": "apple smartphone",
+            "test_event": "V"
+          },
+          {
+            "product_id": 1004249,
+            "score": 0.9453,
+            "label": "apple smartphone",
+            "test_event": "C"
+          },
+          {
+            "product_id": 1004247,
+            "score": 0.9363,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005115,
+            "score": 0.9175,
+            "label": "apple smartphone",
+            "test_event": "C"
+          },
+          {
+            "product_id": 1003312,
+            "score": 0.9171,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004741,
+            "score": 0.8913,
+            "label": "xiaomi smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004226,
+            "score": 0.8784,
+            "label": "apple smartphone",
+            "test_event": null
+          }
+        ],
+        "Item-kNN": [
+          {
+            "product_id": 1004249,
+            "score": 6.8078,
+            "label": "apple smartphone",
+            "test_event": "C"
+          },
+          {
+            "product_id": 1005115,
+            "score": 6.4209,
+            "label": "apple smartphone",
+            "test_event": "C"
+          },
+          {
+            "product_id": 1003317,
+            "score": 6.1795,
+            "label": "apple smartphone",
+            "test_event": "V"
+          },
+          {
+            "product_id": 1004246,
+            "score": 6.002,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004258,
+            "score": 5.7152,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004250,
+            "score": 5.4879,
+            "label": "apple smartphone",
+            "test_event": "C"
+          },
+          {
+            "product_id": 1005104,
+            "score": 4.9631,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004237,
+            "score": 4.9037,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005105,
+            "score": 4.9022,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1003316,
+            "score": 4.8855,
+            "label": "apple smartphone",
+            "test_event": "V"
+          }
+        ],
+        "Popularity": [
+          {
+            "product_id": 1004856,
+            "score": 1131131.0,
+            "label": "samsung smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004767,
+            "score": 981130.0,
+            "label": "samsung smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005115,
+            "score": 864322.0,
+            "label": "apple smartphone",
+            "test_event": "C"
+          },
+          {
+            "product_id": 1004833,
+            "score": 529376.0,
+            "label": "samsung smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004870,
+            "score": 516525.0,
+            "label": "samsung smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004249,
+            "score": 497596.0,
+            "label": "apple smartphone",
+            "test_event": "C"
+          },
+          {
+            "product_id": 1002544,
+            "score": 453347.0,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005105,
+            "score": 449044.0,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004836,
+            "score": 356367.0,
+            "label": "samsung smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005160,
+            "score": 345515.0,
+            "label": "xiaomi smartphone",
+            "test_event": null
+          }
+        ]
+      },
+      "metrics": {
+        "ALS": {
+          "hits": 5,
+          "hit@10": 1.0,
+          "ndcg@10": 0.5772,
+          "intent_hits": 4,
+          "intent_ndcg@10": 0.7226
+        },
+        "Item-kNN": {
+          "hits": 5,
+          "hit@10": 1.0,
+          "ndcg@10": 0.7022,
+          "intent_hits": 3,
+          "intent_ndcg@10": 0.7757
+        },
+        "Popularity": {
+          "hits": 2,
+          "hit@10": 1.0,
+          "ndcg@10": 0.2166,
+          "intent_hits": 2,
+          "intent_ndcg@10": 0.3342
+        }
+      }
+    },
+    {
+      "user_id": 563535197,
+      "history": {
+        "events": 26,
+        "products": 13
+      },
+      "test": {
+        "events": 9,
+        "products": 3,
+        "intent_products": 1
+      },
+      "has_rec_batch": true,
+      "pop_key": "pop:cat:2053013555262783879",
+      "lists": {
+        "ALS": [
+          {
+            "product_id": 3100640,
+            "score": 0.758,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100034,
+            "score": 0.615,
+            "label": "braun blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100491,
+            "score": 0.5994,
+            "label": "polaris blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100267,
+            "score": 0.5747,
+            "label": "vitek blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100074,
+            "score": 0.5275,
+            "label": "braun blender",
+            "test_event": "C"
+          },
+          {
+            "product_id": 3100871,
+            "score": 0.4533,
+            "label": "vitek blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100541,
+            "score": 0.4472,
+            "label": "polaris blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100917,
+            "score": 0.4025,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100970,
+            "score": 0.3979,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100583,
+            "score": 0.3622,
+            "label": "redmond blender",
+            "test_event": null
+          }
+        ],
+        "Item-kNN": [
+          {
+            "product_id": 3100034,
+            "score": 1.1646,
+            "label": "braun blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100439,
+            "score": 1.0761,
+            "label": "braun blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100970,
+            "score": 1.0377,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100251,
+            "score": 0.9997,
+            "label": "braun blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100189,
+            "score": 0.8788,
+            "label": "braun blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100583,
+            "score": 0.8763,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100640,
+            "score": 0.871,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100074,
+            "score": 0.8586,
+            "label": "braun blender",
+            "test_event": "C"
+          },
+          {
+            "product_id": 3100662,
+            "score": 0.8513,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100841,
+            "score": 0.816,
+            "label": "braun blender",
+            "test_event": null
+          }
+        ],
+        "Popularity": [
+          {
+            "product_id": 3100640,
+            "score": 28816.0,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100267,
+            "score": 20196.0,
+            "label": "vitek blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100491,
+            "score": 18339.0,
+            "label": "polaris blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100034,
+            "score": 15829.0,
+            "label": "braun blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100074,
+            "score": 12523.0,
+            "label": "braun blender",
+            "test_event": "C"
+          },
+          {
+            "product_id": 3100871,
+            "score": 11394.0,
+            "label": "vitek blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100541,
+            "score": 9377.0,
+            "label": "polaris blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100917,
+            "score": 8510.0,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100970,
+            "score": 8283.0,
+            "label": "redmond blender",
+            "test_event": null
+          },
+          {
+            "product_id": 3100575,
+            "score": 8273.0,
+            "label": "bosch blender",
+            "test_event": null
+          }
+        ]
+      },
+      "metrics": {
+        "ALS": {
+          "hits": 1,
+          "hit@10": 1.0,
+          "ndcg@10": 0.1815,
+          "intent_hits": 1,
+          "intent_ndcg@10": 0.3869
+        },
+        "Item-kNN": {
+          "hits": 1,
+          "hit@10": 1.0,
+          "ndcg@10": 0.148,
+          "intent_hits": 1,
+          "intent_ndcg@10": 0.3155
+        },
+        "Popularity": {
+          "hits": 1,
+          "hit@10": 1.0,
+          "ndcg@10": 0.1815,
+          "intent_hits": 1,
+          "intent_ndcg@10": 0.3869
+        }
+      }
+    },
+    {
+      "user_id": 573026457,
+      "history": {
+        "events": 0,
+        "products": 0
+      },
+      "test": {
+        "events": 5,
+        "products": 1,
+        "intent_products": 1
+      },
+      "has_rec_batch": false,
+      "pop_key": "pop:global",
+      "lists": {
+        "ALS": [],
+        "Item-kNN": [],
+        "Popularity": [
+          {
+            "product_id": 1004856,
+            "score": 1131131.0,
+            "label": "samsung smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004767,
+            "score": 981130.0,
+            "label": "samsung smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005115,
+            "score": 864322.0,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 4804056,
+            "score": 548224.0,
+            "label": "apple headphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004833,
+            "score": 529376.0,
+            "label": "samsung smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004870,
+            "score": 516525.0,
+            "label": "samsung smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1004249,
+            "score": 497596.0,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1002544,
+            "score": 453347.0,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 1005105,
+            "score": 449044.0,
+            "label": "apple smartphone",
+            "test_event": null
+          },
+          {
+            "product_id": 5100816,
+            "score": 381040.0,
+            "label": "xiaomi",
+            "test_event": null
+          }
+        ]
+      },
+      "metrics": {
+        "ALS": {
+          "hits": 0,
+          "hit@10": 0.0,
+          "ndcg@10": 0.0,
+          "intent_hits": 0,
+          "intent_ndcg@10": 0.0
+        },
+        "Item-kNN": {
+          "hits": 0,
+          "hit@10": 0.0,
+          "ndcg@10": 0.0,
+          "intent_hits": 0,
+          "intent_ndcg@10": 0.0
+        },
+        "Popularity": {
+          "hits": 0,
+          "hit@10": 0.0,
+          "ndcg@10": 0.0,
+          "intent_hits": 0,
+          "intent_ndcg@10": 0.0
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+Batch lists from Redis localhost:6379/0, meta:batch:last_run = 2026-11-12T05:09:54Z
+
+User 515425546
+  history before 2019-11-16: 129 events, 78 products (view 126, cart 3)
+  test period 2019-11-16..2019-11-30: 89 events, 55 products (view 85, cart 3, purchase 1)
+  rec:batch: yes
+  latest history events, UTC (newest first, up to 8):
+    2019-11-15 14:18  view       7006333  carriage                          77.04
+    2019-11-14 20:26  view      28715563  adidas keds                       75.03
+    2019-11-14 20:24  view      28715772  nexpero shoes                     68.21
+    2019-11-14 20:23  view      52500160  nike shoes                        40.93
+    2019-11-14 20:23  view      52500171  nike shoes                        54.06
+    2019-11-14 20:23  view      52500152  nike shoes                        46.33
+    2019-11-14 20:23  view      52500149  nike shoes                        46.33
+    2019-11-14 20:22  view      52500143  nike shoes                        46.33
+
+   #  ALS                                 Item-kNN                            Popularity (pop:cat:20530135528636
+   1   55000008 nike costume           *    7300194 transcend              *    7300440 transcend
+   2    4804718 apple headphone        *    7300209 transcend              *    7300464 apacer
+   3    4804056 apple headphone        *    7300208 transcend              *    7300020 transcend              *
+   4   52100001 nike                   *    4804056 apple headphone        *    7300194 transcend              *
+   5    4804055 apple headphone        *    4804055 apple headphone        *    7300476 apacer
+   6    4802036 apple headphone        *    7300373 transcend                   7300465 apacer
+   7    4804572 apple headphone        *    7300105 transcend              *    7300401 transcend
+   8    1005105 apple smartphone       *    4804572 apple headphone        *    7300070 toshiba
+   9    1005115 apple smartphone       *    7300284 transcend              *    7300489 transcend
+  10    1005135 apple smartphone      V*    7300069 transcend              *    7300212 transcend
+      hits 1, NDCG@10 0.064               hits 0, NDCG@10 0.000               hits 0, NDCG@10 0.000               <- all test events
+      hits 0, NDCG@10 0.000               hits 0, NDCG@10 0.000               hits 0, NDCG@10 0.000               <- cart/purchase only
+  P/C/V = purchased/carted/viewed in the test period, * = already in the history
+
+User 515813436
+  history before 2019-11-16: 142 events, 61 products (view 132, cart 10)
+  test period 2019-11-16..2019-11-30: 59 events, 8 products (view 45, cart 14)
+  rec:batch: yes
+  latest history events, UTC (newest first, up to 8):
+    2019-11-15 19:05  cart       1005116  apple smartphone                 994.34
+    2019-11-15 19:05  view       1005116  apple smartphone                 994.34
+    2019-11-15 19:04  view       1004250  apple smartphone                 868.75
+    2019-11-15 19:04  cart       1004250  apple smartphone                 868.75
+    2019-11-15 19:03  view       1004250  apple smartphone                 868.75
+    2019-11-15 19:02  view       1004226  apple smartphone                 952.15
+    2019-11-15 19:01  view       1004226  apple smartphone                 952.15
+    2019-11-15 19:00  view       1005116  apple smartphone                 994.34
+
+   #  ALS                                 Item-kNN                            Popularity (pop:cat:20530135556318
+   1    1004246 apple smartphone       *    1004249 apple smartphone      C*    1004856 samsung smartphone
+   2    1005116 apple smartphone      C*    1005115 apple smartphone      C*    1004767 samsung smartphone     *
+   3    1004250 apple smartphone      C*    1003317 apple smartphone      V*    1005115 apple smartphone      C*
+   4    1003316 apple smartphone      V*    1004246 apple smartphone       *    1004833 samsung smartphone
+   5    1004249 apple smartphone      C*    1004258 apple smartphone       *    1004870 samsung smartphone
+   6    1004247 apple smartphone       *    1004250 apple smartphone      C*    1004249 apple smartphone      C*
+   7    1005115 apple smartphone      C*    1005104 apple smartphone            1002544 apple smartphone
+   8    1003312 apple smartphone       *    1004237 apple smartphone            1005105 apple smartphone
+   9    1004741 xiaomi smartphone      *    1005105 apple smartphone            1004836 samsung smartphone
+  10    1004226 apple smartphone       *    1003316 apple smartphone      V*    1005160 xiaomi smartphone      *
+      hits 5, NDCG@10 0.577               hits 5, NDCG@10 0.702               hits 2, NDCG@10 0.217               <- all test events
+      hits 4, NDCG@10 0.723               hits 3, NDCG@10 0.776               hits 2, NDCG@10 0.334               <- cart/purchase only
+  P/C/V = purchased/carted/viewed in the test period, * = already in the history
+
+User 563535197
+  history before 2019-11-16: 26 events, 13 products (view 26)
+  test period 2019-11-16..2019-11-30: 9 events, 3 products (view 6, cart 3)
+  rec:batch: yes
+  latest history events, UTC (newest first, up to 8):
+    2019-11-14 16:11  view       3100074  braun blender                     74.62
+    2019-11-14 16:11  view       3100251  braun blender                     82.34
+    2019-11-14 16:07  view       3100034  braun blender                     54.03
+    2019-11-14 16:05  view       3100722  braun blender                     84.92
+    2019-11-14 16:03  view       3100074  braun blender                     74.62
+    2019-11-14 16:02  view       3100074  braun blender                     74.62
+    2019-11-14 15:43  view       3100074  braun blender                     74.62
+    2019-11-14 15:30  view       3100074  braun blender                     74.62
+
+   #  ALS                                 Item-kNN                            Popularity (pop:cat:20530135552627
+   1    3100640 redmond blender        *    3100034 braun blender          *    3100640 redmond blender        *
+   2    3100034 braun blender          *    3100439 braun blender               3100267 vitek blender
+   3    3100491 polaris blender             3100970 redmond blender             3100491 polaris blender
+   4    3100267 vitek blender               3100251 braun blender          *    3100034 braun blender          *
+   5    3100074 braun blender         C*    3100189 braun blender               3100074 braun blender         C*
+   6    3100871 vitek blender               3100583 redmond blender             3100871 vitek blender
+   7    3100541 polaris blender             3100640 redmond blender        *    3100541 polaris blender
+   8    3100917 redmond blender             3100074 braun blender         C*    3100917 redmond blender
+   9    3100970 redmond blender             3100662 redmond blender             3100970 redmond blender
+  10    3100583 redmond blender             3100841 braun blender               3100575 bosch blender
+      hits 1, NDCG@10 0.181               hits 1, NDCG@10 0.148               hits 1, NDCG@10 0.181               <- all test events
+      hits 1, NDCG@10 0.387               hits 1, NDCG@10 0.316               hits 1, NDCG@10 0.387               <- cart/purchase only
+  P/C/V = purchased/carted/viewed in the test period, * = already in the history
+
+User 573026457
+  history before 2019-11-16: 0 events, 0 products
+  test period 2019-11-16..2019-11-30: 5 events, 1 products (view 4, cart 1)
+  rec:batch: no (the API falls back to popularity)
+  latest history events, UTC (newest first, up to 8):
+    (none: a new user)
+
+   #  ALS                                 Item-kNN                            Popularity (pop:global)
+   1                                                                            1004856 samsung smartphone
+   2                                                                            1004767 samsung smartphone
+   3                                                                            1005115 apple smartphone
+   4                                                                            4804056 apple headphone
+   5                                                                            1004833 samsung smartphone
+   6                                                                            1004870 samsung smartphone
+   7                                                                            1004249 apple smartphone
+   8                                                                            1002544 apple smartphone
+   9                                                                            1005105 apple smartphone
+  10                                                                            5100816 xiaomi
+      hits 0, NDCG@10 0.000               hits 0, NDCG@10 0.000               hits 0, NDCG@10 0.000               <- all test events
+      hits 0, NDCG@10 0.000               hits 0, NDCG@10 0.000               hits 0, NDCG@10 0.000               <- cart/purchase only
+  P/C/V = purchased/carted/viewed in the test period, * = already in the history
