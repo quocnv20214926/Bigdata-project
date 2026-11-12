@@ -1,0 +1,2202 @@
+{
+  "protocol": {
+    "train": [
+      "2019-10-01",
+      "2019-11-15"
+    ],
+    "test": [
+      "2019-11-16",
+      "2019-11-30"
+    ],
+    "truth_events": [
+      "view",
+      "cart",
+      "purchase"
+    ],
+    "ks": [
+      10,
+      20
+    ],
+    "eval_users_requested": 100000,
+    "segment_users_requested": 30000,
+    "segments": {
+      "new": "no training interactions",
+      "light": "1 to 5 training products",
+      "heavy": "more than 5 training products"
+    },
+    "fallback": "lists completed with the global Popularity ranking",
+    "unseen": "training products removed from the lists and from the ground truth",
+    "bootstrap": {
+      "resamples": 1000,
+      "level": 0.95,
+      "seed": 42
+    }
+  },
+  "als_params": {
+    "rank": 128,
+    "reg_param": 0.1,
+    "alpha": 5.0,
+    "max_iter": 5,
+    "seed": 42,
+    "checkpoint_interval": 2,
+    "blocks": 10
+  },
+  "knn_params": {
+    "neighbours": 50,
+    "max_items_per_user": 50,
+    "min_common_users": 2
+  },
+  "data": {
+    "interactions": {
+      "pairs": 39584014,
+      "users": 4205076,
+      "products": 191909,
+      "density": 4.905e-05
+    },
+    "als_matrix": {
+      "pairs": 38195148,
+      "users": 2890519,
+      "products": 155423,
+      "density": 8.502e-05
+    },
+    "segments": {
+      "new": 1111573,
+      "light": 521763,
+      "heavy": 805610
+    },
+    "scored_users": 139892,
+    "als_users": 100000,
+    "item_knn_users": 109848,
+    "truth": {
+      "all": {
+        "users": 139892,
+        "pairs": 1254033
+      },
+      "unseen": {
+        "users": 133797,
+        "pairs": 1130056
+      }
+    }
+  },
+  "results": {
+    "warm": {
+      "own_list_share": {
+        "item_knn": 1.0,
+        "als": 1.0
+      },
+      "all": {
+        "users": 100000,
+        "models": {
+          "popularity": {
+            "precision@10": {
+              "mean": 0.040589,
+              "low": 0.040091,
+              "high": 0.041058
+            },
+            "recall@10": {
+              "mean": 0.076663,
+              "low": 0.075349,
+              "high": 0.077815
+            },
+            "hit_rate@10": {
+              "mean": 0.2595,
+              "low": 0.25672,
+              "high": 0.261951
+            },
+            "ndcg@10": {
+              "mean": 0.069064,
+              "low": 0.068109,
+              "high": 0.069927
+            },
+            "precision@20": {
+              "mean": 0.030891,
+              "low": 0.030507,
+              "high": 0.031263
+            },
+            "recall@20": {
+              "mean": 0.107438,
+              "low": 0.105909,
+              "high": 0.108827
+            },
+            "hit_rate@20": {
+              "mean": 0.3165,
+              "low": 0.31358,
+              "high": 0.31928
+            },
+            "ndcg@20": {
+              "mean": 0.076449,
+              "low": 0.075508,
+              "high": 0.077369
+            }
+          },
+          "item_knn": {
+            "precision@10": {
+              "mean": 0.060587,
+              "low": 0.059846,
+              "high": 0.061334
+            },
+            "recall@10": {
+              "mean": 0.090303,
+              "low": 0.088984,
+              "high": 0.091613
+            },
+            "hit_rate@10": {
+              "mean": 0.30222,
+              "low": 0.299379,
+              "high": 0.305071
+            },
+            "ndcg@10": {
+              "mean": 0.090939,
+              "low": 0.089867,
+              "high": 0.091998
+            },
+            "precision@20": {
+              "mean": 0.047668,
+              "low": 0.047118,
+              "high": 0.048247
+            },
+            "recall@20": {
+              "mean": 0.13668,
+              "low": 0.135152,
+              "high": 0.138287
+            },
+            "hit_rate@20": {
+              "mean": 0.37776,
+              "low": 0.374849,
+              "high": 0.38098
+            },
+            "ndcg@20": {
+              "mean": 0.101673,
+              "low": 0.10057,
+              "high": 0.102744
+            }
+          },
+          "als": {
+            "precision@10": {
+              "mean": 0.066653,
+              "low": 0.065976,
+              "high": 0.067338
+            },
+            "recall@10": {
+              "mean": 0.116225,
+              "low": 0.11467,
+              "high": 0.117739
+            },
+            "hit_rate@10": {
+              "mean": 0.3561,
+              "low": 0.353159,
+              "high": 0.358881
+            },
+            "ndcg@10": {
+              "mean": 0.122572,
+              "low": 0.121255,
+              "high": 0.12391
+            },
+            "precision@20": {
+              "mean": 0.047123,
+              "low": 0.046631,
+              "high": 0.047614
+            },
+            "recall@20": {
+              "mean": 0.149713,
+              "low": 0.147995,
+              "high": 0.151395
+            },
+            "hit_rate@20": {
+              "mean": 0.41198,
+              "low": 0.40899,
+              "high": 0.414851
+            },
+            "ndcg@20": {
+              "mean": 0.127435,
+              "low": 0.126123,
+              "high": 0.128691
+            }
+          }
+        },
+        "differences": {
+          "als - popularity": {
+            "precision@10": {
+              "mean": 0.026064,
+              "low": 0.025415,
+              "high": 0.026812
+            },
+            "recall@10": {
+              "mean": 0.039562,
+              "low": 0.038007,
+              "high": 0.041291
+            },
+            "hit_rate@10": {
+              "mean": 0.0966,
+              "low": 0.0933,
+              "high": 0.099891
+            },
+            "ndcg@10": {
+              "mean": 0.053508,
+              "low": 0.052127,
+              "high": 0.054969
+            },
+            "precision@20": {
+              "mean": 0.016232,
+              "low": 0.015764,
+              "high": 0.016725
+            },
+            "recall@20": {
+              "mean": 0.042275,
+              "low": 0.040495,
+              "high": 0.044259
+            },
+            "hit_rate@20": {
+              "mean": 0.09548,
+              "low": 0.092169,
+              "high": 0.099
+            },
+            "ndcg@20": {
+              "mean": 0.050985,
+              "low": 0.049587,
+              "high": 0.052392
+            }
+          },
+          "als - item_knn": {
+            "precision@10": {
+              "mean": 0.006066,
+              "low": 0.00554,
+              "high": 0.00658
+            },
+            "recall@10": {
+              "mean": 0.025923,
+              "low": 0.024546,
+              "high": 0.02723
+            },
+            "hit_rate@10": {
+              "mean": 0.05388,
+              "low": 0.05133,
+              "high": 0.056391
+            },
+            "ndcg@10": {
+              "mean": 0.031633,
+              "low": 0.030459,
+              "high": 0.032673
+            },
+            "precision@20": {
+              "mean": -0.000544,
+              "low": -0.000875,
+              "high": -0.000223
+            },
+            "recall@20": {
+              "mean": 0.013033,
+              "low": 0.011637,
+              "high": 0.014307
+            },
+            "hit_rate@20": {
+              "mean": 0.03422,
+              "low": 0.03179,
+              "high": 0.036811
+            },
+            "ndcg@20": {
+              "mean": 0.025762,
+              "low": 0.024701,
+              "high": 0.026744
+            }
+          },
+          "item_knn - popularity": {
+            "precision@10": {
+              "mean": 0.019998,
+              "low": 0.019283,
+              "high": 0.020764
+            },
+            "recall@10": {
+              "mean": 0.013639,
+              "low": 0.012098,
+              "high": 0.015342
+            },
+            "hit_rate@10": {
+              "mean": 0.04272,
+              "low": 0.039378,
+              "high": 0.04615
+            },
+            "ndcg@10": {
+              "mean": 0.021875,
+              "low": 0.020623,
+              "high": 0.023185
+            },
+            "precision@20": {
+              "mean": 0.016776,
+              "low": 0.016252,
+              "high": 0.017313
+            },
+            "recall@20": {
+              "mean": 0.029242,
+              "low": 0.027401,
+              "high": 0.031223
+            },
+            "hit_rate@20": {
+              "mean": 0.06126,
+              "low": 0.057689,
+              "high": 0.064641
+            },
+            "ndcg@20": {
+              "mean": 0.025224,
+              "low": 0.023942,
+              "high": 0.026551
+            }
+          }
+        }
+      },
+      "unseen": {
+        "users": 94448,
+        "models": {
+          "popularity": {
+            "precision@10": {
+              "mean": 0.03124,
+              "low": 0.030759,
+              "high": 0.031687
+            },
+            "recall@10": {
+              "mean": 0.063182,
+              "low": 0.062019,
+              "high": 0.064333
+            },
+            "hit_rate@10": {
+              "mean": 0.213514,
+              "low": 0.210867,
+              "high": 0.216247
+            },
+            "ndcg@10": {
+              "mean": 0.056025,
+              "low": 0.055138,
+              "high": 0.056887
+            },
+            "precision@20": {
+              "mean": 0.023604,
+              "low": 0.023272,
+              "high": 0.023921
+            },
+            "recall@20": {
+              "mean": 0.088475,
+              "low": 0.087101,
+              "high": 0.089787
+            },
+            "hit_rate@20": {
+              "mean": 0.264961,
+              "low": 0.261943,
+              "high": 0.267883
+            },
+            "ndcg@20": {
+              "mean": 0.062193,
+              "low": 0.06128,
+              "high": 0.063043
+            }
+          },
+          "item_knn": {
+            "precision@10": {
+              "mean": 0.039389,
+              "low": 0.038811,
+              "high": 0.039947
+            },
+            "recall@10": {
+              "mean": 0.072032,
+              "low": 0.070766,
+              "high": 0.073279
+            },
+            "hit_rate@10": {
+              "mean": 0.236045,
+              "low": 0.233207,
+              "high": 0.238799
+            },
+            "ndcg@10": {
+              "mean": 0.068479,
+              "low": 0.067403,
+              "high": 0.069528
+            },
+            "precision@20": {
+              "mean": 0.030563,
+              "low": 0.030127,
+              "high": 0.03097
+            },
+            "recall@20": {
+              "mean": 0.104224,
+              "low": 0.102651,
+              "high": 0.105792
+            },
+            "hit_rate@20": {
+              "mean": 0.301637,
+              "low": 0.298768,
+              "high": 0.304718
+            },
+            "ndcg@20": {
+              "mean": 0.076435,
+              "low": 0.075352,
+              "high": 0.077486
+            }
+          },
+          "als": {
+            "precision@10": {
+              "mean": 0.031304,
+              "low": 0.030841,
+              "high": 0.031787
+            },
+            "recall@10": {
+              "mean": 0.055555,
+              "low": 0.054414,
+              "high": 0.056695
+            },
+            "hit_rate@10": {
+              "mean": 0.202461,
+              "low": 0.199887,
+              "high": 0.20512
+            },
+            "ndcg@10": {
+              "mean": 0.053422,
+              "low": 0.052544,
+              "high": 0.054357
+            },
+            "precision@20": {
+              "mean": 0.024775,
+              "low": 0.024426,
+              "high": 0.025123
+            },
+            "recall@20": {
+              "mean": 0.082853,
+              "low": 0.081486,
+              "high": 0.084233
+            },
+            "hit_rate@20": {
+              "mean": 0.270244,
+              "low": 0.267364,
+              "high": 0.273093
+            },
+            "ndcg@20": {
+              "mean": 0.060297,
+              "low": 0.059383,
+              "high": 0.061241
+            }
+          }
+        },
+        "differences": {
+          "als - popularity": {
+            "precision@10": {
+              "mean": 6.4e-05,
+              "low": -0.000569,
+              "high": 0.000667
+            },
+            "recall@10": {
+              "mean": -0.007627,
+              "low": -0.009321,
+              "high": -0.005912
+            },
+            "hit_rate@10": {
+              "mean": -0.011054,
+              "low": -0.014516,
+              "high": -0.007548
+            },
+            "ndcg@10": {
+              "mean": -0.002603,
+              "low": -0.003867,
+              "high": -0.001275
+            },
+            "precision@20": {
+              "mean": 0.001171,
+              "low": 0.000729,
+              "high": 0.001572
+            },
+            "recall@20": {
+              "mean": -0.005622,
+              "low": -0.007464,
+              "high": -0.003727
+            },
+            "hit_rate@20": {
+              "mean": 0.005283,
+              "low": 0.00165,
+              "high": 0.008852
+            },
+            "ndcg@20": {
+              "mean": -0.001897,
+              "low": -0.003208,
+              "high": -0.000597
+            }
+          },
+          "als - item_knn": {
+            "precision@10": {
+              "mean": -0.008085,
+              "low": -0.008505,
+              "high": -0.007653
+            },
+            "recall@10": {
+              "mean": -0.016477,
+              "low": -0.017509,
+              "high": -0.015399
+            },
+            "hit_rate@10": {
+              "mean": -0.033585,
+              "low": -0.035882,
+              "high": -0.031159
+            },
+            "ndcg@10": {
+              "mean": -0.015057,
+              "low": -0.015886,
+              "high": -0.014217
+            },
+            "precision@20": {
+              "mean": -0.005788,
+              "low": -0.006054,
+              "high": -0.005522
+            },
+            "recall@20": {
+              "mean": -0.021371,
+              "low": -0.022531,
+              "high": -0.020214
+            },
+            "hit_rate@20": {
+              "mean": -0.031393,
+              "low": -0.033691,
+              "high": -0.028946
+            },
+            "ndcg@20": {
+              "mean": -0.016138,
+              "low": -0.016923,
+              "high": -0.015311
+            }
+          },
+          "item_knn - popularity": {
+            "precision@10": {
+              "mean": 0.008148,
+              "low": 0.007501,
+              "high": 0.008773
+            },
+            "recall@10": {
+              "mean": 0.00885,
+              "low": 0.007308,
+              "high": 0.010456
+            },
+            "hit_rate@10": {
+              "mean": 0.022531,
+              "low": 0.019143,
+              "high": 0.025866
+            },
+            "ndcg@10": {
+              "mean": 0.012454,
+              "low": 0.011192,
+              "high": 0.013722
+            },
+            "precision@20": {
+              "mean": 0.006959,
+              "low": 0.006505,
+              "high": 0.007396
+            },
+            "recall@20": {
+              "mean": 0.015749,
+              "low": 0.013887,
+              "high": 0.017569
+            },
+            "hit_rate@20": {
+              "mean": 0.036676,
+              "low": 0.033076,
+              "high": 0.040213
+            },
+            "ndcg@20": {
+              "mean": 0.014241,
+              "low": 0.012997,
+              "high": 0.015492
+            }
+          }
+        }
+      },
+      "coverage@10": {
+        "all": {
+          "popularity": 6.4e-05,
+          "item_knn": 0.361201,
+          "als": 0.013177
+        },
+        "unseen": {
+          "popularity": 0.00027,
+          "item_knn": 0.364624,
+          "als": 0.017925
+        }
+      }
+    },
+    "new": {
+      "own_list_share": {
+        "item_knn": 0.0,
+        "als": 0.0
+      },
+      "all": {
+        "users": 30000,
+        "models": {
+          "popularity": {
+            "precision@10": {
+              "mean": 0.023863,
+              "low": 0.023177,
+              "high": 0.024571
+            },
+            "recall@10": {
+              "mean": 0.086838,
+              "low": 0.08418,
+              "high": 0.089673
+            },
+            "hit_rate@10": {
+              "mean": 0.1734,
+              "low": 0.168967,
+              "high": 0.178005
+            },
+            "ndcg@10": {
+              "mean": 0.059877,
+              "low": 0.057995,
+              "high": 0.061772
+            },
+            "precision@20": {
+              "mean": 0.01837,
+              "low": 0.017856,
+              "high": 0.01888
+            },
+            "recall@20": {
+              "mean": 0.123485,
+              "low": 0.120379,
+              "high": 0.126573
+            },
+            "hit_rate@20": {
+              "mean": 0.226033,
+              "low": 0.221267,
+              "high": 0.230667
+            },
+            "ndcg@20": {
+              "mean": 0.07069,
+              "low": 0.068717,
+              "high": 0.072503
+            }
+          },
+          "item_knn": {
+            "precision@10": {
+              "mean": 0.023863,
+              "low": 0.023177,
+              "high": 0.024571
+            },
+            "recall@10": {
+              "mean": 0.086838,
+              "low": 0.08418,
+              "high": 0.089673
+            },
+            "hit_rate@10": {
+              "mean": 0.1734,
+              "low": 0.168967,
+              "high": 0.178005
+            },
+            "ndcg@10": {
+              "mean": 0.059877,
+              "low": 0.057995,
+              "high": 0.061772
+            },
+            "precision@20": {
+              "mean": 0.01837,
+              "low": 0.017856,
+              "high": 0.01888
+            },
+            "recall@20": {
+              "mean": 0.123485,
+              "low": 0.120379,
+              "high": 0.126573
+            },
+            "hit_rate@20": {
+              "mean": 0.226033,
+              "low": 0.221267,
+              "high": 0.230667
+            },
+            "ndcg@20": {
+              "mean": 0.07069,
+              "low": 0.068717,
+              "high": 0.072503
+            }
+          },
+          "als": {
+            "precision@10": {
+              "mean": 0.023863,
+              "low": 0.023177,
+              "high": 0.024571
+            },
+            "recall@10": {
+              "mean": 0.086838,
+              "low": 0.08418,
+              "high": 0.089673
+            },
+            "hit_rate@10": {
+              "mean": 0.1734,
+              "low": 0.168967,
+              "high": 0.178005
+            },
+            "ndcg@10": {
+              "mean": 0.059877,
+              "low": 0.057995,
+              "high": 0.061772
+            },
+            "precision@20": {
+              "mean": 0.01837,
+              "low": 0.017856,
+              "high": 0.01888
+            },
+            "recall@20": {
+              "mean": 0.123485,
+              "low": 0.120379,
+              "high": 0.126573
+            },
+            "hit_rate@20": {
+              "mean": 0.226033,
+              "low": 0.221267,
+              "high": 0.230667
+            },
+            "ndcg@20": {
+              "mean": 0.07069,
+              "low": 0.068717,
+              "high": 0.072503
+            }
+          }
+        },
+        "differences": {
+          "als - popularity": {
+            "precision@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "precision@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            }
+          },
+          "als - item_knn": {
+            "precision@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "precision@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            }
+          },
+          "item_knn - popularity": {
+            "precision@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "precision@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            }
+          }
+        }
+      },
+      "unseen": {
+        "users": 30000,
+        "models": {
+          "popularity": {
+            "precision@10": {
+              "mean": 0.023863,
+              "low": 0.023177,
+              "high": 0.024571
+            },
+            "recall@10": {
+              "mean": 0.086838,
+              "low": 0.08418,
+              "high": 0.089673
+            },
+            "hit_rate@10": {
+              "mean": 0.1734,
+              "low": 0.168967,
+              "high": 0.178005
+            },
+            "ndcg@10": {
+              "mean": 0.059877,
+              "low": 0.057995,
+              "high": 0.061772
+            },
+            "precision@20": {
+              "mean": 0.01837,
+              "low": 0.017856,
+              "high": 0.01888
+            },
+            "recall@20": {
+              "mean": 0.123485,
+              "low": 0.120379,
+              "high": 0.126573
+            },
+            "hit_rate@20": {
+              "mean": 0.226033,
+              "low": 0.221267,
+              "high": 0.230667
+            },
+            "ndcg@20": {
+              "mean": 0.07069,
+              "low": 0.068717,
+              "high": 0.072503
+            }
+          },
+          "item_knn": {
+            "precision@10": {
+              "mean": 0.023863,
+              "low": 0.023177,
+              "high": 0.024571
+            },
+            "recall@10": {
+              "mean": 0.086838,
+              "low": 0.08418,
+              "high": 0.089673
+            },
+            "hit_rate@10": {
+              "mean": 0.1734,
+              "low": 0.168967,
+              "high": 0.178005
+            },
+            "ndcg@10": {
+              "mean": 0.059877,
+              "low": 0.057995,
+              "high": 0.061772
+            },
+            "precision@20": {
+              "mean": 0.01837,
+              "low": 0.017856,
+              "high": 0.01888
+            },
+            "recall@20": {
+              "mean": 0.123485,
+              "low": 0.120379,
+              "high": 0.126573
+            },
+            "hit_rate@20": {
+              "mean": 0.226033,
+              "low": 0.221267,
+              "high": 0.230667
+            },
+            "ndcg@20": {
+              "mean": 0.07069,
+              "low": 0.068717,
+              "high": 0.072503
+            }
+          },
+          "als": {
+            "precision@10": {
+              "mean": 0.023863,
+              "low": 0.023177,
+              "high": 0.024571
+            },
+            "recall@10": {
+              "mean": 0.086838,
+              "low": 0.08418,
+              "high": 0.089673
+            },
+            "hit_rate@10": {
+              "mean": 0.1734,
+              "low": 0.168967,
+              "high": 0.178005
+            },
+            "ndcg@10": {
+              "mean": 0.059877,
+              "low": 0.057995,
+              "high": 0.061772
+            },
+            "precision@20": {
+              "mean": 0.01837,
+              "low": 0.017856,
+              "high": 0.01888
+            },
+            "recall@20": {
+              "mean": 0.123485,
+              "low": 0.120379,
+              "high": 0.126573
+            },
+            "hit_rate@20": {
+              "mean": 0.226033,
+              "low": 0.221267,
+              "high": 0.230667
+            },
+            "ndcg@20": {
+              "mean": 0.07069,
+              "low": 0.068717,
+              "high": 0.072503
+            }
+          }
+        },
+        "differences": {
+          "als - popularity": {
+            "precision@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "precision@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            }
+          },
+          "als - item_knn": {
+            "precision@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "precision@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            }
+          },
+          "item_knn - popularity": {
+            "precision@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@10": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "precision@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "recall@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "hit_rate@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            },
+            "ndcg@20": {
+              "mean": 0.0,
+              "low": 0.0,
+              "high": 0.0
+            }
+          }
+        }
+      }
+    },
+    "light": {
+      "own_list_share": {
+        "item_knn": 0.9985,
+        "als": 0.6703
+      },
+      "all": {
+        "users": 30000,
+        "models": {
+          "popularity": {
+            "precision@10": {
+              "mean": 0.032187,
+              "low": 0.031393,
+              "high": 0.032947
+            },
+            "recall@10": {
+              "mean": 0.097047,
+              "low": 0.094191,
+              "high": 0.099634
+            },
+            "hit_rate@10": {
+              "mean": 0.224467,
+              "low": 0.219832,
+              "high": 0.229167
+            },
+            "ndcg@10": {
+              "mean": 0.07114,
+              "low": 0.069419,
+              "high": 0.073025
+            },
+            "precision@20": {
+              "mean": 0.023247,
+              "low": 0.022697,
+              "high": 0.023765
+            },
+            "recall@20": {
+              "mean": 0.131982,
+              "low": 0.128968,
+              "high": 0.135158
+            },
+            "hit_rate@20": {
+              "mean": 0.273533,
+              "low": 0.268632,
+              "high": 0.278668
+            },
+            "ndcg@20": {
+              "mean": 0.081154,
+              "low": 0.079388,
+              "high": 0.083071
+            }
+          },
+          "item_knn": {
+            "precision@10": {
+              "mean": 0.02963,
+              "low": 0.028823,
+              "high": 0.030477
+            },
+            "recall@10": {
+              "mean": 0.076678,
+              "low": 0.074292,
+              "high": 0.078908
+            },
+            "hit_rate@10": {
+              "mean": 0.185433,
+              "low": 0.180966,
+              "high": 0.1899
+            },
+            "ndcg@10": {
+              "mean": 0.059991,
+              "low": 0.058233,
+              "high": 0.061724
+            },
+            "precision@20": {
+              "mean": 0.022663,
+              "low": 0.02208,
+              "high": 0.023258
+            },
+            "recall@20": {
+              "mean": 0.11472,
+              "low": 0.111749,
+              "high": 0.117481
+            },
+            "hit_rate@20": {
+              "mean": 0.2394,
+              "low": 0.234898,
+              "high": 0.244433
+            },
+            "ndcg@20": {
+              "mean": 0.071306,
+              "low": 0.069516,
+              "high": 0.072992
+            }
+          },
+          "als": {
+            "precision@10": {
+              "mean": 0.037293,
+              "low": 0.036436,
+              "high": 0.038227
+            },
+            "recall@10": {
+              "mean": 0.113824,
+              "low": 0.110904,
+              "high": 0.11687
+            },
+            "hit_rate@10": {
+              "mean": 0.243433,
+              "low": 0.2389,
+              "high": 0.248201
+            },
+            "ndcg@10": {
+              "mean": 0.09567,
+              "low": 0.093355,
+              "high": 0.098033
+            },
+            "precision@20": {
+              "mean": 0.025243,
+              "low": 0.024665,
+              "high": 0.02585
+            },
+            "recall@20": {
+              "mean": 0.144774,
+              "low": 0.141578,
+              "high": 0.147919
+            },
+            "hit_rate@20": {
+              "mean": 0.2877,
+              "low": 0.282832,
+              "high": 0.292871
+            },
+            "ndcg@20": {
+              "mean": 0.104027,
+              "low": 0.101737,
+              "high": 0.106437
+            }
+          }
+        },
+        "differences": {
+          "als - popularity": {
+            "precision@10": {
+              "mean": 0.005107,
+              "low": 0.004213,
+              "high": 0.005983
+            },
+            "recall@10": {
+              "mean": 0.016776,
+              "low": 0.013735,
+              "high": 0.019992
+            },
+            "hit_rate@10": {
+              "mean": 0.018967,
+              "low": 0.013999,
+              "high": 0.024033
+            },
+            "ndcg@10": {
+              "mean": 0.024529,
+              "low": 0.022095,
+              "high": 0.027042
+            },
+            "precision@20": {
+              "mean": 0.001997,
+              "low": 0.001402,
+              "high": 0.002598
+            },
+            "recall@20": {
+              "mean": 0.012792,
+              "low": 0.009312,
+              "high": 0.016347
+            },
+            "hit_rate@20": {
+              "mean": 0.014167,
+              "low": 0.009162,
+              "high": 0.0197
+            },
+            "ndcg@20": {
+              "mean": 0.022873,
+              "low": 0.020405,
+              "high": 0.025386
+            }
+          },
+          "als - item_knn": {
+            "precision@10": {
+              "mean": 0.007663,
+              "low": 0.006906,
+              "high": 0.00843
+            },
+            "recall@10": {
+              "mean": 0.037145,
+              "low": 0.034275,
+              "high": 0.040128
+            },
+            "hit_rate@10": {
+              "mean": 0.058,
+              "low": 0.053564,
+              "high": 0.062733
+            },
+            "ndcg@10": {
+              "mean": 0.035679,
+              "low": 0.033274,
+              "high": 0.038203
+            },
+            "precision@20": {
+              "mean": 0.00258,
+              "low": 0.002115,
+              "high": 0.003035
+            },
+            "recall@20": {
+              "mean": 0.030055,
+              "low": 0.027003,
+              "high": 0.033282
+            },
+            "hit_rate@20": {
+              "mean": 0.0483,
+              "low": 0.043599,
+              "high": 0.053233
+            },
+            "ndcg@20": {
+              "mean": 0.032721,
+              "low": 0.030417,
+              "high": 0.035082
+            }
+          },
+          "item_knn - popularity": {
+            "precision@10": {
+              "mean": -0.002557,
+              "low": -0.00358,
+              "high": -0.001677
+            },
+            "recall@10": {
+              "mean": -0.020369,
+              "low": -0.023653,
+              "high": -0.017152
+            },
+            "hit_rate@10": {
+              "mean": -0.039033,
+              "low": -0.044737,
+              "high": -0.033666
+            },
+            "ndcg@10": {
+              "mean": -0.01115,
+              "low": -0.013479,
+              "high": -0.008942
+            },
+            "precision@20": {
+              "mean": -0.000583,
+              "low": -0.001285,
+              "high": 4e-05
+            },
+            "recall@20": {
+              "mean": -0.017262,
+              "low": -0.021223,
+              "high": -0.013559
+            },
+            "hit_rate@20": {
+              "mean": -0.034133,
+              "low": -0.039635,
+              "high": -0.028364
+            },
+            "ndcg@20": {
+              "mean": -0.009848,
+              "low": -0.01229,
+              "high": -0.007478
+            }
+          }
+        }
+      },
+      "unseen": {
+        "users": 28297,
+        "models": {
+          "popularity": {
+            "precision@10": {
+              "mean": 0.028646,
+              "low": 0.0279,
+              "high": 0.029456
+            },
+            "recall@10": {
+              "mean": 0.085102,
+              "low": 0.082664,
+              "high": 0.087716
+            },
+            "hit_rate@10": {
+              "mean": 0.202954,
+              "low": 0.198502,
+              "high": 0.207725
+            },
+            "ndcg@10": {
+              "mean": 0.063497,
+              "low": 0.061741,
+              "high": 0.065335
+            },
+            "precision@20": {
+              "mean": 0.020886,
+              "low": 0.020352,
+              "high": 0.021448
+            },
+            "recall@20": {
+              "mean": 0.116805,
+              "low": 0.113652,
+              "high": 0.12004
+            },
+            "hit_rate@20": {
+              "mean": 0.24939,
+              "low": 0.24416,
+              "high": 0.254479
+            },
+            "ndcg@20": {
+              "mean": 0.072572,
+              "low": 0.070688,
+              "high": 0.07449
+            }
+          },
+          "item_knn": {
+            "precision@10": {
+              "mean": 0.027105,
+              "low": 0.026306,
+              "high": 0.027858
+            },
+            "recall@10": {
+              "mean": 0.078742,
+              "low": 0.076215,
+              "high": 0.081191
+            },
+            "hit_rate@10": {
+              "mean": 0.17698,
+              "low": 0.172701,
+              "high": 0.18108
+            },
+            "ndcg@10": {
+              "mean": 0.061259,
+              "low": 0.059464,
+              "high": 0.063044
+            },
+            "precision@20": {
+              "mean": 0.020184,
+              "low": 0.019603,
+              "high": 0.020739
+            },
+            "recall@20": {
+              "mean": 0.110223,
+              "low": 0.107322,
+              "high": 0.113221
+            },
+            "hit_rate@20": {
+              "mean": 0.223487,
+              "low": 0.218715,
+              "high": 0.228295
+            },
+            "ndcg@20": {
+              "mean": 0.070503,
+              "low": 0.068601,
+              "high": 0.07243
+            }
+          },
+          "als": {
+            "precision@10": {
+              "mean": 0.024907,
+              "low": 0.024147,
+              "high": 0.025625
+            },
+            "recall@10": {
+              "mean": 0.072025,
+              "low": 0.069832,
+              "high": 0.07443
+            },
+            "hit_rate@10": {
+              "mean": 0.172916,
+              "low": 0.168568,
+              "high": 0.177086
+            },
+            "ndcg@10": {
+              "mean": 0.055269,
+              "low": 0.053626,
+              "high": 0.056919
+            },
+            "precision@20": {
+              "mean": 0.018465,
+              "low": 0.017942,
+              "high": 0.018983
+            },
+            "recall@20": {
+              "mean": 0.10187,
+              "low": 0.099128,
+              "high": 0.104627
+            },
+            "hit_rate@20": {
+              "mean": 0.22225,
+              "low": 0.217478,
+              "high": 0.226597
+            },
+            "ndcg@20": {
+              "mean": 0.0639,
+              "low": 0.062181,
+              "high": 0.065599
+            }
+          }
+        },
+        "differences": {
+          "als - popularity": {
+            "precision@10": {
+              "mean": -0.003739,
+              "low": -0.004545,
+              "high": -0.002887
+            },
+            "recall@10": {
+              "mean": -0.013077,
+              "low": -0.015555,
+              "high": -0.010256
+            },
+            "hit_rate@10": {
+              "mean": -0.030039,
+              "low": -0.03474,
+              "high": -0.025053
+            },
+            "ndcg@10": {
+              "mean": -0.008228,
+              "low": -0.010175,
+              "high": -0.006125
+            },
+            "precision@20": {
+              "mean": -0.002421,
+              "low": -0.00297,
+              "high": -0.001885
+            },
+            "recall@20": {
+              "mean": -0.014935,
+              "low": -0.017989,
+              "high": -0.011903
+            },
+            "hit_rate@20": {
+              "mean": -0.027141,
+              "low": -0.03223,
+              "high": -0.021804
+            },
+            "ndcg@20": {
+              "mean": -0.008672,
+              "low": -0.010684,
+              "high": -0.006515
+            }
+          },
+          "als - item_knn": {
+            "precision@10": {
+              "mean": -0.002198,
+              "low": -0.002912,
+              "high": -0.001474
+            },
+            "recall@10": {
+              "mean": -0.006717,
+              "low": -0.009176,
+              "high": -0.004061
+            },
+            "hit_rate@10": {
+              "mean": -0.004064,
+              "low": -0.008729,
+              "high": 0.000178
+            },
+            "ndcg@10": {
+              "mean": -0.005991,
+              "low": -0.007706,
+              "high": -0.004172
+            },
+            "precision@20": {
+              "mean": -0.001719,
+              "low": -0.002191,
+              "high": -0.001232
+            },
+            "recall@20": {
+              "mean": -0.008353,
+              "low": -0.011257,
+              "high": -0.0056
+            },
+            "hit_rate@20": {
+              "mean": -0.001237,
+              "low": -0.005833,
+              "high": 0.003252
+            },
+            "ndcg@20": {
+              "mean": -0.006603,
+              "low": -0.008328,
+              "high": -0.004869
+            }
+          },
+          "item_knn - popularity": {
+            "precision@10": {
+              "mean": -0.001541,
+              "low": -0.002509,
+              "high": -0.000576
+            },
+            "recall@10": {
+              "mean": -0.00636,
+              "low": -0.009667,
+              "high": -0.002989
+            },
+            "hit_rate@10": {
+              "mean": -0.025974,
+              "low": -0.031699,
+              "high": -0.020531
+            },
+            "ndcg@10": {
+              "mean": -0.002238,
+              "low": -0.004586,
+              "high": 0.000216
+            },
+            "precision@20": {
+              "mean": -0.000701,
+              "low": -0.001382,
+              "high": -1.7e-05
+            },
+            "recall@20": {
+              "mean": -0.006582,
+              "low": -0.010309,
+              "high": -0.002741
+            },
+            "hit_rate@20": {
+              "mean": -0.025904,
+              "low": -0.031665,
+              "high": -0.019718
+            },
+            "ndcg@20": {
+              "mean": -0.002069,
+              "low": -0.004535,
+              "high": 0.000461
+            }
+          }
+        }
+      }
+    },
+    "heavy": {
+      "own_list_share": {
+        "item_knn": 1.0,
+        "als": 1.0
+      },
+      "all": {
+        "users": 30000,
+        "models": {
+          "popularity": {
+            "precision@10": {
+              "mean": 0.04336,
+              "low": 0.042327,
+              "high": 0.044364
+            },
+            "recall@10": {
+              "mean": 0.068016,
+              "low": 0.065923,
+              "high": 0.070034
+            },
+            "hit_rate@10": {
+              "mean": 0.269667,
+              "low": 0.264767,
+              "high": 0.274601
+            },
+            "ndcg@10": {
+              "mean": 0.067799,
+              "low": 0.066303,
+              "high": 0.06944
+            },
+            "precision@20": {
+              "mean": 0.03352,
+              "low": 0.032755,
+              "high": 0.034293
+            },
+            "recall@20": {
+              "mean": 0.096063,
+              "low": 0.093577,
+              "high": 0.09846
+            },
+            "hit_rate@20": {
+              "mean": 0.328067,
+              "low": 0.322898,
+              "high": 0.333333
+            },
+            "ndcg@20": {
+              "mean": 0.07374,
+              "low": 0.072113,
+              "high": 0.075434
+            }
+          },
+          "item_knn": {
+            "precision@10": {
+              "mean": 0.071773,
+              "low": 0.070222,
+              "high": 0.073354
+            },
+            "recall@10": {
+              "mean": 0.091927,
+              "low": 0.0896,
+              "high": 0.094182
+            },
+            "hit_rate@10": {
+              "mean": 0.341033,
+              "low": 0.335433,
+              "high": 0.346403
+            },
+            "ndcg@10": {
+              "mean": 0.10102,
+              "low": 0.098819,
+              "high": 0.103148
+            },
+            "precision@20": {
+              "mean": 0.056642,
+              "low": 0.055485,
+              "high": 0.057778
+            },
+            "recall@20": {
+              "mean": 0.138244,
+              "low": 0.135441,
+              "high": 0.141039
+            },
+            "hit_rate@20": {
+              "mean": 0.420233,
+              "low": 0.414566,
+              "high": 0.425634
+            },
+            "ndcg@20": {
+              "mean": 0.110306,
+              "low": 0.108151,
+              "high": 0.112381
+            }
+          },
+          "als": {
+            "precision@10": {
+              "mean": 0.07797,
+              "low": 0.076527,
+              "high": 0.079408
+            },
+            "recall@10": {
+              "mean": 0.113772,
+              "low": 0.111142,
+              "high": 0.11625
+            },
+            "hit_rate@10": {
+              "mean": 0.398467,
+              "low": 0.392733,
+              "high": 0.404168
+            },
+            "ndcg@10": {
+              "mean": 0.128684,
+              "low": 0.126332,
+              "high": 0.131134
+            },
+            "precision@20": {
+              "mean": 0.05577,
+              "low": 0.054688,
+              "high": 0.056772
+            },
+            "recall@20": {
+              "mean": 0.148254,
+              "low": 0.14518,
+              "high": 0.151257
+            },
+            "hit_rate@20": {
+              "mean": 0.457433,
+              "low": 0.451933,
+              "high": 0.463135
+            },
+            "ndcg@20": {
+              "mean": 0.131911,
+              "low": 0.129564,
+              "high": 0.134265
+            }
+          }
+        },
+        "differences": {
+          "als - popularity": {
+            "precision@10": {
+              "mean": 0.03461,
+              "low": 0.033182,
+              "high": 0.036007
+            },
+            "recall@10": {
+              "mean": 0.045757,
+              "low": 0.043021,
+              "high": 0.04842
+            },
+            "hit_rate@10": {
+              "mean": 0.1288,
+              "low": 0.122732,
+              "high": 0.1347
+            },
+            "ndcg@10": {
+              "mean": 0.060885,
+              "low": 0.05845,
+              "high": 0.06318
+            },
+            "precision@20": {
+              "mean": 0.02225,
+              "low": 0.021267,
+              "high": 0.023138
+            },
+            "recall@20": {
+              "mean": 0.052191,
+              "low": 0.048886,
+              "high": 0.055113
+            },
+            "hit_rate@20": {
+              "mean": 0.129367,
+              "low": 0.123065,
+              "high": 0.135368
+            },
+            "ndcg@20": {
+              "mean": 0.058171,
+              "low": 0.055721,
+              "high": 0.060526
+            }
+          },
+          "als - item_knn": {
+            "precision@10": {
+              "mean": 0.006197,
+              "low": 0.005086,
+              "high": 0.007327
+            },
+            "recall@10": {
+              "mean": 0.021845,
+              "low": 0.019607,
+              "high": 0.023992
+            },
+            "hit_rate@10": {
+              "mean": 0.057433,
+              "low": 0.052367,
+              "high": 0.062401
+            },
+            "ndcg@10": {
+              "mean": 0.027664,
+              "low": 0.025562,
+              "high": 0.029688
+            },
+            "precision@20": {
+              "mean": -0.000872,
+              "low": -0.001592,
+              "high": -0.00022
+            },
+            "recall@20": {
+              "mean": 0.01001,
+              "low": 0.007708,
+              "high": 0.012206
+            },
+            "hit_rate@20": {
+              "mean": 0.0372,
+              "low": 0.032566,
+              "high": 0.042001
+            },
+            "ndcg@20": {
+              "mean": 0.021605,
+              "low": 0.019697,
+              "high": 0.023392
+            }
+          },
+          "item_knn - popularity": {
+            "precision@10": {
+              "mean": 0.028413,
+              "low": 0.026883,
+              "high": 0.029923
+            },
+            "recall@10": {
+              "mean": 0.023911,
+              "low": 0.021374,
+              "high": 0.026495
+            },
+            "hit_rate@10": {
+              "mean": 0.071367,
+              "low": 0.0648,
+              "high": 0.077733
+            },
+            "ndcg@10": {
+              "mean": 0.033221,
+              "low": 0.030939,
+              "high": 0.035367
+            },
+            "precision@20": {
+              "mean": 0.023122,
+              "low": 0.022027,
+              "high": 0.02422
+            },
+            "recall@20": {
+              "mean": 0.042181,
+              "low": 0.039174,
+              "high": 0.04519
+            },
+            "hit_rate@20": {
+              "mean": 0.092167,
+              "low": 0.085867,
+              "high": 0.098567
+            },
+            "ndcg@20": {
+              "mean": 0.036566,
+              "low": 0.034321,
+              "high": 0.038849
+            }
+          }
+        }
+      },
+      "unseen": {
+        "users": 28401,
+        "models": {
+          "popularity": {
+            "precision@10": {
+              "mean": 0.031668,
+              "low": 0.030882,
+              "high": 0.032446
+            },
+            "recall@10": {
+              "mean": 0.054105,
+              "low": 0.052206,
+              "high": 0.056101
+            },
+            "hit_rate@10": {
+              "mean": 0.214464,
+              "low": 0.209851,
+              "high": 0.219183
+            },
+            "ndcg@10": {
+              "mean": 0.0525,
+              "low": 0.051024,
+              "high": 0.053938
+            },
+            "precision@20": {
+              "mean": 0.024388,
+              "low": 0.023763,
+              "high": 0.02496
+            },
+            "recall@20": {
+              "mean": 0.075708,
+              "low": 0.073447,
+              "high": 0.078035
+            },
+            "hit_rate@20": {
+              "mean": 0.266012,
+              "low": 0.260658,
+              "high": 0.270909
+            },
+            "ndcg@20": {
+              "mean": 0.057264,
+              "low": 0.055767,
+              "high": 0.058736
+            }
+          },
+          "item_knn": {
+            "precision@10": {
+              "mean": 0.043178,
+              "low": 0.042125,
+              "high": 0.044407
+            },
+            "recall@10": {
+              "mean": 0.067505,
+              "low": 0.065506,
+              "high": 0.069613
+            },
+            "hit_rate@10": {
+              "mean": 0.253759,
+              "low": 0.248512,
+              "high": 0.2589
+            },
+            "ndcg@10": {
+              "mean": 0.069439,
+              "low": 0.06769,
+              "high": 0.071307
+            },
+            "precision@20": {
+              "mean": 0.033876,
+              "low": 0.033059,
+              "high": 0.034744
+            },
+            "recall@20": {
+              "mean": 0.098656,
+              "low": 0.096279,
+              "high": 0.101188
+            },
+            "hit_rate@20": {
+              "mean": 0.324496,
+              "low": 0.318862,
+              "high": 0.329813
+            },
+            "ndcg@20": {
+              "mean": 0.076404,
+              "low": 0.074602,
+              "high": 0.078275
+            }
+          },
+          "als": {
+            "precision@10": {
+              "mean": 0.034654,
+              "low": 0.033749,
+              "high": 0.035615
+            },
+            "recall@10": {
+              "mean": 0.051963,
+              "low": 0.050101,
+              "high": 0.053803
+            },
+            "hit_rate@10": {
+              "mean": 0.221541,
+              "low": 0.216894,
+              "high": 0.226366
+            },
+            "ndcg@10": {
+              "mean": 0.054456,
+              "low": 0.053076,
+              "high": 0.05602
+            },
+            "precision@20": {
+              "mean": 0.027643,
+              "low": 0.026966,
+              "high": 0.028291
+            },
+            "recall@20": {
+              "mean": 0.078298,
+              "low": 0.076113,
+              "high": 0.080574
+            },
+            "hit_rate@20": {
+              "mean": 0.29418,
+              "low": 0.288757,
+              "high": 0.299041
+            },
+            "ndcg@20": {
+              "mean": 0.060456,
+              "low": 0.058982,
+              "high": 0.061965
+            }
+          }
+        },
+        "differences": {
+          "als - popularity": {
+            "precision@10": {
+              "mean": 0.002986,
+              "low": 0.001859,
+              "high": 0.004127
+            },
+            "recall@10": {
+              "mean": -0.002142,
+              "low": -0.004911,
+              "high": 0.000432
+            },
+            "hit_rate@10": {
+              "mean": 0.007077,
+              "low": 0.000845,
+              "high": 0.013591
+            },
+            "ndcg@10": {
+              "mean": 0.001956,
+              "low": -0.000181,
+              "high": 0.004054
+            },
+            "precision@20": {
+              "mean": 0.003255,
+              "low": 0.002508,
+              "high": 0.003989
+            },
+            "recall@20": {
+              "mean": 0.00259,
+              "low": -0.00053,
+              "high": 0.005545
+            },
+            "hit_rate@20": {
+              "mean": 0.028168,
+              "low": 0.021195,
+              "high": 0.034717
+            },
+            "ndcg@20": {
+              "mean": 0.003192,
+              "low": 0.00111,
+              "high": 0.005202
+            }
+          },
+          "als - item_knn": {
+            "precision@10": {
+              "mean": -0.008524,
+              "low": -0.009352,
+              "high": -0.007697
+            },
+            "recall@10": {
+              "mean": -0.015542,
+              "low": -0.017187,
+              "high": -0.013779
+            },
+            "hit_rate@10": {
+              "mean": -0.032217,
+              "low": -0.036551,
+              "high": -0.02771
+            },
+            "ndcg@10": {
+              "mean": -0.014983,
+              "low": -0.016425,
+              "high": -0.013443
+            },
+            "precision@20": {
+              "mean": -0.006232,
+              "low": -0.00678,
+              "high": -0.005727
+            },
+            "recall@20": {
+              "mean": -0.020358,
+              "low": -0.022493,
+              "high": -0.01822
+            },
+            "hit_rate@20": {
+              "mean": -0.030316,
+              "low": -0.034964,
+              "high": -0.025738
+            },
+            "ndcg@20": {
+              "mean": -0.015948,
+              "low": -0.017308,
+              "high": -0.01451
+            }
+          },
+          "item_knn - popularity": {
+            "precision@10": {
+              "mean": 0.01151,
+              "low": 0.010334,
+              "high": 0.012725
+            },
+            "recall@10": {
+              "mean": 0.0134,
+              "low": 0.010759,
+              "high": 0.016014
+            },
+            "hit_rate@10": {
+              "mean": 0.039294,
+              "low": 0.033376,
+              "high": 0.045352
+            },
+            "ndcg@10": {
+              "mean": 0.016939,
+              "low": 0.014781,
+              "high": 0.019182
+            },
+            "precision@20": {
+              "mean": 0.009487,
+              "low": 0.008609,
+              "high": 0.010343
+            },
+            "recall@20": {
+              "mean": 0.022948,
+              "low": 0.019854,
+              "high": 0.025763
+            },
+            "hit_rate@20": {
+              "mean": 0.058484,
+              "low": 0.051652,
+              "high": 0.064928
+            },
+            "ndcg@20": {
+              "mean": 0.01914,
+              "low": 0.016986,
+              "high": 0.021219
+            }
+          }
+        }
+      }
+    }
+  },
+  "seconds": {
+    "prepare": 78.5,
+    "als_train": 695.6,
+    "als_recommend": 23.6,
+    "item_knn": 151.3,
+    "popularity_truth": 12.5,
+    "score": 198.7,
+    "bootstrap": 13.1,
+    "total": 1173.4
+  },
+  "input": "s3a://lake/clean/events/"
+}
