@@ -4,40 +4,41 @@
 
 ### 1. Weekly goals
 
-- Scale test (`docs/plan.md` roadmap, weeks 9 and 10): how the nightly batch time and sizes grow with the amount of data.
-- Final report sections for the data, the batch layer and the evaluation.
+- Final report sections for the data, the batch layer and the evaluation results (`docs/assignment.md`, week 9).
 
 ### 2. Completed work
 
-| Task | Files |
-|---|---|
-| Nightly Spark steps (check, popularity, train, recommend, sim) on the last 6, 12 and 23 days before 2019-11-16, each step its own process as in the Airflow DAG, on a separate MinIO root (`s3a://lake/scale/`, deleted afterwards); the 46-day point is the week 6 nightly run | `docs/scale-week10.json` |
-| Final report, Pair 1 part (in Vietnamese, for the lecturer): data and ETL, batch layer and the nightly run, evaluation of ALS and the baselines, the batch + speed replay, the scale test, limits | shared report document |
+| Section of the final report | Content | Sources |
+|---|---|---|
+| 1. Data | REES46 October and November 2019, EDA findings that shaped the design (sparsity, event mix, missing fields, ALS filter), ETL and the time split | `notebooks/01_eda.ipynb`, `docs/etl-report.json`, `docs/week-02.md` |
+| 2. Batch layer | interaction matrix and weights, Popularity, ALS and its tuning, Item-kNN for `sim:item`, Redis budget and loader, the nightly steps and the Airflow DAG, the week 6 speed-up, the demo script | `docs/week-03.md` to `docs/week-06.md`, `docs/nightly-week06-host.json` |
+| 3. Evaluation of the batch layer | protocol, warm users, new / light / heavy segments, the "unseen" variant, carts and purchases only, all with bootstrap intervals | `docs/eval-week07.json`, `docs/eval-week07-purchase.json` |
+| 4. Batch + speed | the offline replay, cart and purchase targets, products the user has never touched, the similarity ablation, what it means for the API merge | `docs/eval-week08-replay.json`, `docs/eval-week08-new.json` |
+| 5. Limits and future work | offline-only evaluation, Redis budget, ALS re-recommending seen products, single-laptop runs, frozen `sim:cooc` in the replay | |
+
+The report is written in Vietnamese for the lecturer, in a shared document with a diagram of the nightly run and a chart of the "unseen" results. Every number in it comes from the weekly reports and the JSON result files listed above.
 
 ### 3. Results / metrics
 
-Laptop, Spark local mode, 14 GB driver, MinIO in Docker; ALS rank 128, 5 iterations, 10 blocks; `rec:batch` top 50; `sim:item` from Item-kNN. Times in seconds.
+The main numbers the report rests on:
 
-| Days | Events | Users | ALS pairs | ALS users | ALS products | check | popularity | train | recommend | sim | Total |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 6 | 17,217,420 | 1,257,530 | 8,560,406 | 872,137 | 99,589 | 4.7 | 9.1 | 223.9 | 118.4 | 40.2 | **396** (6.6 min) |
-| 12 | 27,986,684 | 1,994,735 | 14,143,191 | 1,374,508 | 118,561 | 5.4 | 10.0 | 333.6 | 217.3 | 73.2 | **640** (10.7 min) |
-| 23 | 42,977,816 | 2,832,080 | 21,840,588 | 1,938,207 | 134,030 | 6.4 | 10.7 | 455.7 | 168.1 | 91.1 | **732** (12.2 min) |
-| 46 | 74,971,956 | 4,205,076 | 38,195,148 | 2,890,519 | 155,423 | 7.9 | 12.3 | 770.2 | 218.9 | 168.1 | **1,177** (19.6 min) |
-
-- From 6 to 46 days the events grow 4.4 times and the total time 3.0 times. Train is more than half of every run and grows with the number of ALS pairs (4.5 times the pairs, 3.4 times the time).
-- `recommend` writes at most 1,083,864 users (the Redis budget of week 5), which every window from 12 days on reaches, so this step stops growing. The 12-day run (217 s) was slower than the 23-day one (168 s) for the same number of users; we did not look further into it, one run per point is not enough to separate it from noise.
-- `sim` grows with the products kept in the matrix (99,589 to 155,423) and the pairs.
-- With `load` and `validate` (96 s and 5 s in week 6), a nightly run on the full 46 days takes about 21 minutes.
+| Result | Value |
+|---|---|
+| ALS on warm test users, NDCG@10 | 0.1226 [0.1213, 0.1239], against 0.0909 for Item-kNN and 0.0691 for Popularity |
+| Test users who are new (Popularity only from the batch layer) | 1,111,573 of 2,438,946 (46%) |
+| ALS without already-seen products | 0.0534, below Item-kNN (0.0685) and Popularity (0.0560) |
+| Nightly run on the full history | 21 minutes, 1,232,939 batch keys in 943 MB of Redis |
+| Replay, cart and purchase targets | batch only 0.1281, best batch + speed 0.1163; 98% of the carted products are already in `user:recent` |
+| Replay, products never touched | speed only 0.1351, ALS 0.0454, Popularity 0.0396 |
 
 ### 4. Issues & resolutions
 
 | Issue | Resolution |
 |---|---|
-| The scale runs must not touch the tables the API's nightly run uses | Separate root `s3a://lake/scale/` and stats folder `data/scale-runs/`; `load` and `validate` were not run; `cleanup --keep-runs 0` on that root removed the three runs |
-| Only one run per window | Enough to see the trend; the variation between runs of the same window is not measured |
+| The report is read by the lecturer, the weekly reports by the team | The report explains each choice in plain words and keeps the tables to the numbers that support a conclusion; the details stay in `docs/week-XX.md` |
+| Section 4 depended on the week 8 replay | Written last, after both replay protocols had run |
 
 ### 5. Plan for next week
 
-- Open the remaining Pair 1 PRs and answer review comments.
-- Help Pair 2 with the slides and the demo where the batch layer is involved.
+- Scale test of the nightly batch (optional in `docs/assignment.md`).
+- Review of the report with Pair 2.
