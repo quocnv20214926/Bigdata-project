@@ -102,6 +102,7 @@ functions of `common/scoring.py` that it will use.
 |---|---|
 | Days | validation 2019-11-09 (models from 10-01 .. 11-08), test 2019-11-16 (models from 10-01 .. 11-15): the morning after a nightly run |
 | Targets | one cart or purchase event per user on the day, 30,000 users (`--targets`); relevant product = the product of that event |
+| `--targets-mode new` | almost every cart is for a product already in `user:recent` (29,438 of 30,000 on 11-16), so the plan's targets mostly measure showing the products just viewed again. This mode takes instead one event per user whose product the user has never touched before, and leaves every product touched before the target out of every list (week 7's "unseen" filter): `rec:batch` is the ALS top 50 without them, out of the top 150, and `rec:rt` the top 50 without them. There are no "+self" variants, since the `user:recent` products are left out |
 | Batch layer | ALS top 50 with scores (`rec:batch`), Item-kNN top 50 (`sim:item`), `pop:global`, all from the events before the day |
 | `sim:cooc` | counted as `streaming/sinks/cooc.py` does (last 10 distinct products of a session, `cooc / sqrt(cnt_i * cnt_j)`, clipped at 1, top 50), from the events before the day, so frozen like `sim:item`; a test checks the counts and similarities against the streaming code |
 | `user:recent`, `user:bought` | the user's 20 newest events before the target, if the newest is under 24 h old; the products bought before it, if the last purchase is under 30 days old |
@@ -116,4 +117,6 @@ SPARK_DRIVER_MEMORY=14g python -m evaluation.replay --report docs/eval-week08-re
 python -m evaluation.replay --cache-dir /tmp/replay-days --only validation
 python -m evaluation.replay --cache-dir /tmp/replay-days --only test
 python -m evaluation.replay --cache-dir /tmp/replay-days --report docs/eval-week08-replay.json
+# products the user has never touched (the days are saved as validation-new and test-new)
+SPARK_DRIVER_MEMORY=14g python -m evaluation.replay --targets-mode new --report docs/eval-week08-new.json --cache-dir /tmp/replay-days
 ```

@@ -98,6 +98,26 @@ def test_pick_targets_one_per_user(spark):
     assert len(replay.pick_targets(events_frame(spark, rows), day, 1, seed=42).collect()) == 1
 
 
+def test_pick_targets_new_products(spark):
+    day = date(2019, 11, 16)
+    t = datetime(2019, 11, 16, 9, 0)
+    rows = [(t - timedelta(days=3), "view", 10, 1, "a0"),
+            (t, "view", 10, 1, "a"),                                   # seen 3 days ago: not new
+            (t + timedelta(minutes=5), "view", 11, 1, "a"),            # first touch of 11: the target
+            (t + timedelta(minutes=6), "cart", 11, 1, "a"),            # second touch of 11
+            (t, "cart", 12, 2, "b"),                                   # a first touch can be a cart
+            (t - timedelta(days=1), "view", 13, 3, "c")]               # user 3: nothing on the day
+    events = events_frame(spark, rows)
+    targets = replay.pick_targets(events, day, 0, seed=42, mode="new").cache()
+    got = sorted((r["user_id"], r["product_id"], r["event_type"]) for r in targets.collect())
+    assert got == [(1, 11, "view"), (2, 12, "cart")]
+    tid = {r["user_id"]: r["target_id"] for r in targets.collect()}
+    seen = replay.seen_products(events, targets)
+    assert sorted((r["target_id"], r["product_id"]) for r in seen.collect()) == [(tid[1], 10)]
+    with pytest.raises(ValueError):
+        replay.pick_targets(events, day, 0, seed=42, mode="views")
+
+
 def test_speed_state(spark):
     t = datetime(2019, 11, 16, 12, 0)
     rows = [(t - timedelta(days=40), "purchase", 30, 1, "old"),        # bought 40 days ago, kept: last purchase is recent
@@ -151,6 +171,15 @@ def test_self_adds_the_recent_products(spark):
     assert set(got) == {1, 2, 5}
 
 
+def test_realtime_scores_leave_out_the_excluded_products(spark):
+    recent = spark.createDataFrame([(0, 1, "view", 600), (0, 2, "cart", 3600)],
+                                   ["target_id", "product_id", "event_type", "age"])
+    sims = spark.createDataFrame([(1, 5, 0.5), (2, 5, 1.0)], ["product_id", "neighbour_id", "sim"])
+    left_out = spark.createDataFrame([(0, 1), (0, 2)], ["target_id", "product_id"])
+    got = replay.realtime_scores(recent, replay.with_self(sims, recent), half_lives=(1800,), exclude=left_out)
+    assert {r["product_id"] for r in got.collect()} == {5}
+
+
 def test_rank_variants_uses_the_api_merge():
     import pandas as pd
 
@@ -191,10 +220,14 @@ def test_choose():
     assert chosen["hybrid"] == "hybrid:item:20:0.5"
 
 
-def tiny_world(spark):
+def tiny_world(spark, new_products=False):
     """Products come in pairs viewed together in October sessions; on each replayed day a user
     views one product of a pair and carts the other five minutes later. Product 99 is bought by
-    everyone in October (the most popular product, then removed as bought)."""
+    everyone in October (the most popular product, then removed as bought).
+
+    With new_products, the user also views, two minutes after the first product of pair k, a product
+    never touched before: 30 + k on 11-09 and 40 + k on 11-16. Users 41 to 58 viewed the pair's
+    first product, 30 + k and 40 + k in one October session, so they co-occur."""
     pairs = [(10, 11), (12, 13), (14, 15), (20, 21), (22, 23), (24, 25)]
     base = datetime(2019, 10, 2, 10, 0)
     rows = []
@@ -208,6 +241,14 @@ def tiny_world(spark):
             x, y = pairs[u % 6]
             t0 = datetime(day.year, day.month, day.day, 12, 0) + timedelta(minutes=u)
             rows += [(t0, "view", x, u, f"t{u}-{day.day}"), (t0 + timedelta(minutes=5), "cart", y, u, f"t{u}-{day.day}")]
+            if new_products:
+                fresh = (30 if day.day == 9 else 40) + u % 6
+                rows.append((t0 + timedelta(minutes=2), "view", fresh, u, f"t{u}-{day.day}"))
+    if new_products:
+        for u in range(41, 59):
+            k, t0 = u % 6, base + timedelta(days=u % 20, hours=3)
+            rows += [(t0 + timedelta(minutes=m), "view", p, u, f"b{u}")
+                     for m, p in enumerate((pairs[k][0], 30 + k, 40 + k))]
     return events_frame(spark, rows)
 
 
@@ -232,6 +273,27 @@ def test_replay_end_to_end(spark):
     assert test["differences"]["hybrid - popularity"]["ndcg@10"]["low"] > 0
     assert test["groups"]["neither"]["targets"] == 0 and test["groups"]["neither"]["batch"]["ndcg@10"] is None
     assert format_lines(report) == 1 + 1 + len(v) + len(test["differences"])
+
+
+def test_replay_new_products_end_to_end(spark):
+    report = replay.run(tiny_world(spark, new_products=True), ALSParams(rank=4, reg_param=0.01, max_iter=3),
+                        n_targets=0, half_lives=(1800, 43200), alphas=(0.3, 0.7), resamples=100, mode="new")
+    json.dumps(report)
+    assert report["protocol"]["mode"] == "new"
+    val, test = report["validation"], report["test"]
+    assert val["data"]["targets"] == test["data"]["targets"] == 40
+    assert val["data"]["target_events"] == test["data"]["target_events"] == {"view": 40}   # 30 + k, then 40 + k
+    assert test["data"]["target_in_recent"] == 0                 # never touched, so never in user:recent
+    assert val["data"]["seen_pairs"] == 40 * 7                    # 3 October pairs and 99
+    assert test["data"]["seen_pairs"] == 40 * 8                   # and 30 + k, viewed on 11-09
+    assert len(test["grid"]) == 2 + 3 * 2 * (1 + 2)             # no "+self" variants
+    chosen = report["chosen_on_validation"]
+    assert set(chosen) == {f"{kind}:{s}" for kind in ("speed", "hybrid") for s in replay.BASE_SIMS} | {"hybrid"}
+    assert not any(replay.SELF_SUFFIX in d for d in test["differences"])
+    v = test["variants"]
+    # with the seen products left out, 40 + k is the strongest co-occurrence of the product just viewed
+    assert v["speed:cooc"]["hit_rate@10"]["mean"] == 1.0
+    assert v["speed:cooc"]["ndcg@10"]["mean"] > v["popularity"]["ndcg@10"]["mean"]
 
 
 def format_lines(report):

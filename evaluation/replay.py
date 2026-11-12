@@ -18,7 +18,10 @@ For a cutoff day C, the morning after a nightly run:
                    30 days old;
       rec:rt       common.scoring.propagate of every user:recent event through a similarity table,
                    decayed to the target time, top 50;
-  - targets: one cart or purchase event per user on day C, for a sample of users;
+  - targets: one cart or purchase event per user on day C, for a sample of users (mode "cart",
+    the plan's protocol); or, mode "new", one event per user on day C whose product the user has
+    never touched before, with every product the user touched before the target left out of every
+    list (week 7's "unseen" filter: rec:batch is then the ALS top 50 without them, out of the top 150);
   - variants: popularity only; batch only; speed only (cooc, item or hybrid similarity, each also
     "+self", with the user:recent products themselves added to rec:rt; five half-lives); batch +
     speed with alpha 0.1 .. 0.95. Each is ranked by common.scoring.merge_scores (what the API
@@ -31,6 +34,7 @@ variants with 95% bootstrap intervals over targets (one per user) and paired dif
 
 Usage (from the repository root, MinIO running):
   SPARK_DRIVER_MEMORY=14g python -m evaluation.replay --report docs/eval-week08-replay.json
+  SPARK_DRIVER_MEMORY=14g python -m evaluation.replay --targets-mode new --report docs/eval-week08-new.json
 """
 
 from __future__ import annotations
@@ -60,6 +64,11 @@ from common.scoring import DEFAULT_HALF_LIFE_SECONDS, merge_scores
 from evaluation import bootstrap
 
 TARGET_EVENTS = ("cart", "purchase")
+# "cart": a cart or purchase event (docs/plan.md section 7); "new": the first event ever of the user
+# on a product. Almost every cart is for a product in user:recent, so "cart" mostly measures showing
+# the products just viewed again; "new" measures finding products the user has not seen.
+TARGET_MODES = ("cart", "new")
+NEW_BATCH_POOL = 3 * settings.batch_top_n   # mode "new": ALS candidates before the seen products are removed
 DEFAULT_TARGETS = 30_000
 BASE_SIMS = ("cooc", "item", "hybrid")
 # "+self": the same table plus sim(i, i) = 1 for the user:recent products, so rec:rt also holds the
@@ -161,11 +170,21 @@ def hybrid_similarities(item: DataFrame, cooc: DataFrame, n: int = settings.sim_
 
 # ---- targets and the speed layer state ---------------------------------------------------------
 
-def pick_targets(events: DataFrame, day: date, n: int, seed: int) -> DataFrame:
-    """(target_id, user_id, product_id, event_type, event_time): one cart or purchase event of `day`
-    per user, for n users (0 = all), the same ones for the same seed."""
-    cand = (events.where((F.col("event_date") == F.lit(day)) & F.col("event_type").isin(*TARGET_EVENTS))
-            .select("user_id", "product_id", "event_type", "event_time").distinct())
+def pick_targets(events: DataFrame, day: date, n: int, seed: int, mode: str = "cart") -> DataFrame:
+    """(target_id, user_id, product_id, event_type, event_time): one event of `day` per user, for n
+    users (0 = all), the same ones for the same seed. Mode "cart": a cart or purchase event; mode
+    "new": the user's first event ever on the product."""
+    today = events.where(F.col("event_date") == F.lit(day))
+    if mode == "cart":
+        cand = today.where(F.col("event_type").isin(*TARGET_EVENTS))
+    elif mode == "new":
+        first = (events.where(F.col("event_date") <= F.lit(day))
+                 .join(today.select("user_id").distinct(), "user_id", "left_semi")
+                 .groupBy("user_id", "product_id").agg(F.min("event_time").alias("event_time")))
+        cand = today.join(first, ["user_id", "product_id", "event_time"])
+    else:
+        raise ValueError(f"mode must be one of {TARGET_MODES}, not {mode!r}")
+    cand = cand.select("user_id", "product_id", "event_type", "event_time").distinct()
     one = Window.partitionBy("user_id").orderBy(
         F.xxhash64("product_id", "event_type", "event_time", F.lit(seed)), "event_time", "product_id")
     per_user = cand.withColumn("pos", F.row_number().over(one)).where(F.col("pos") == 1).drop("pos")
@@ -204,9 +223,20 @@ def speed_state(events: DataFrame, targets: DataFrame, recent_n: int = settings.
     return recent, bought
 
 
-def realtime_scores(recent: DataFrame, sims: DataFrame, half_lives=HALF_LIVES, top_n: int = RT_TOP_N) -> DataFrame:
+def seen_products(events: DataFrame, targets: DataFrame) -> DataFrame:
+    """(target_id, product_id): every product the user touched before the target event."""
+    t = targets.select("target_id", "user_id", F.col("event_time").alias("t"))
+    return (events.join(targets.select("user_id"), "user_id", "left_semi")
+            .select("user_id", "product_id", "event_time")
+            .join(t, "user_id").where(F.col("event_time") < F.col("t"))
+            .select("target_id", "product_id").distinct())
+
+
+def realtime_scores(recent: DataFrame, sims: DataFrame, half_lives=HALF_LIVES, top_n: int = RT_TOP_N,
+                    exclude: DataFrame | None = None) -> DataFrame:
     """(target_id, half_life, product_id, score): rec:rt as common.scoring.propagate builds it,
-    rt[j] = sum over user:recent events of w_e * sim(i, j) * exp(-ln 2 * age / half_life), top n."""
+    rt[j] = sum over user:recent events of w_e * sim(i, j) * exp(-ln 2 * age / half_life), top n.
+    exclude: (target_id, product_id) pairs left out before the top n."""
     w = event_weight(F.col("event_type"))
     parts = (recent.withColumn("w", w).where(F.col("w") > 0)
              .join(sims.where(F.col("sim") > 0), "product_id")
@@ -214,6 +244,8 @@ def realtime_scores(recent: DataFrame, sims: DataFrame, half_lives=HALF_LIVES, t
     sums = [F.sum(F.col("w") * F.col("sim") * F.exp(-math.log(2) * F.col("age") / F.lit(float(hl)))).alias(f"hl{hl}")
             for hl in half_lives]
     scores = parts.groupBy("target_id", F.col("neighbour_id").alias("product_id")).agg(*sums)
+    if exclude is not None:
+        scores = scores.join(exclude.select("target_id", "product_id"), ["target_id", "product_id"], "left_anti")
     long = scores.select("target_id", "product_id", F.explode(F.array(*[
         F.struct(F.lit(hl).alias("half_life"), F.col(f"hl{hl}").alias("score")) for hl in half_lives])).alias("x"))
     long = long.select("target_id", F.col("x.half_life").alias("half_life"), "product_id", F.col("x.score").alias("score"))
@@ -338,7 +370,8 @@ def choose(grid: dict, metric: str = "ndcg@10", half_lives=HALF_LIVES, alphas=AL
 # ---- one cutoff ------------------------------------------------------------------------------------
 
 def replay_day(events: DataFrame, cutoff: date, params: als.ALSParams, knn_params: item_knn.KNNParams,
-               n_targets: int, half_lives=HALF_LIVES, alphas=ALPHAS, ks=KS) -> dict:
+               n_targets: int, half_lives=HALF_LIVES, alphas=ALPHAS, ks=KS, mode: str = "cart",
+               sims_run=SIMS) -> dict:
     """Models from the events before `cutoff`, targets on `cutoff`. Returns sizes, timings and,
     per target, the ranks of every variant."""
     timings, t = {}, time.time()
@@ -347,7 +380,7 @@ def replay_day(events: DataFrame, cutoff: date, params: als.ALSParams, knn_param
     history = events.where((F.col("event_date") >= F.lit(TRAIN_START)) & (F.col("event_date") < F.lit(cutoff)))
     upto = events.where((F.col("event_date") >= F.lit(TRAIN_START)) & (F.col("event_date") <= F.lit(cutoff)))
 
-    targets = pick_targets(events, cutoff, n_targets, params.seed).cache()
+    targets = pick_targets(events, cutoff, n_targets, params.seed, mode).cache()
     target_users = targets.select("user_id")
     data = {"history": [str(TRAIN_START), str(cutoff)], "target_day": str(cutoff),
             "targets": targets.count(),
@@ -365,7 +398,8 @@ def replay_day(events: DataFrame, cutoff: date, params: als.ALSParams, knn_param
     model = als.train(matrix, params)
     timings["als_train"] = round(time.time() - t, 1)
     t = time.time()
-    batch = to_dicts(als.recommend(model, target_users, settings.batch_top_n)
+    pool = NEW_BATCH_POOL if mode == "new" else settings.batch_top_n
+    batch = to_dicts(als.recommend(model, target_users, pool)
                      .select("user_id", "product_id", "score").toPandas(), "user_id")
     popular = [int(r["product_id"]) for r in
                top_global(product_popularity(history), k + 200).orderBy("rank").collect()]
@@ -393,6 +427,19 @@ def replay_day(events: DataFrame, cutoff: date, params: als.ALSParams, knn_param
     for r in bought_df.collect():
         bought.setdefault(int(r["target_id"]), set()).add(int(r["product_id"]))
     tpdf = targets.select("target_id", "user_id", "product_id").toPandas().sort_values("target_id")
+    exclude, seen = {tid: set(ps) for tid, ps in bought.items()}, None
+    if mode == "new":                  # leave every product touched before the target out of every list
+        seen = seen_products(upto, targets).cache()
+        spdf = seen.toPandas()
+        data["seen_pairs"] = len(spdf)
+        for tid, p in zip(spdf["target_id"].astype(int).tolist(), spdf["product_id"].astype(int).tolist()):
+            exclude.setdefault(tid, set()).add(p)
+        del spdf
+        tid_of = dict(zip(tpdf["user_id"].tolist(), tpdf["target_id"].tolist()))
+        batch = {u: dict(sorted(((p, s) for p, s in b.items() if p not in exclude.get(tid_of.get(u), ())),
+                                key=lambda x: -x[1])[:settings.batch_top_n])
+                 for u, b in batch.items()}
+        batch = {u: b for u, b in batch.items() if b}
     recent_pairs = recent.select("target_id", "product_id").distinct().toPandas()
     with_recent = set(recent_pairs["target_id"].astype(int).tolist())
     in_recent = set(zip(recent_pairs["target_id"].astype(int).tolist(), recent_pairs["product_id"].astype(int).tolist()))
@@ -404,15 +451,15 @@ def replay_day(events: DataFrame, cutoff: date, params: als.ALSParams, knn_param
     timings["speed_state"] = round(time.time() - t, 1)
 
     names, columns = [], []
-    for s in SIMS:                     # one similarity at a time: its rec:rt lists, then its variants
+    for s in sims_run:                 # one similarity at a time: its rec:rt lists, then its variants
         t = time.time()
         table = sims[s] if s in sims else with_self(sims[s.removesuffix(SELF_SUFFIX)], recent)
-        scores = realtime_scores(recent, table, half_lives).toPandas()
+        scores = realtime_scores(recent, table, half_lives, exclude=seen).toPandas()
         rt = {(s, hl): to_dicts(scores[scores["half_life"] == hl], "target_id") for hl in half_lives}
         del scores
         timings[f"rt_{s}"] = round(time.time() - t, 1)
         t = time.time()
-        part_names, part = rank_variants(tpdf, batch, rt, bought, popular, half_lives, alphas, (s,), k)
+        part_names, part = rank_variants(tpdf, batch, rt, exclude, popular, half_lives, alphas, (s,), k)
         keep = [i for i, n in enumerate(part_names) if n not in names]
         names += [part_names[i] for i in keep]
         columns.append(part[:, keep])
@@ -450,6 +497,7 @@ def summarise(day: dict, chosen: dict, ks=KS, resamples: int = bootstrap.DEFAULT
     pairs += [(f"speed:{s}{SELF_SUFFIX}", f"speed:{s}") for s in BASE_SIMS]
     pairs += [(f"speed:{s}{SELF_SUFFIX}", "popularity") for s in BASE_SIMS]
     pairs += [(f"hybrid:{s}{SELF_SUFFIX}", f"hybrid:{s}") for s in BASE_SIMS]
+    pairs = [(a, b) for a, b in pairs if a in shown and b in shown]
     out["differences"] = {f"{a} - {b}": dict(zip(metric_names, bootstrap.paired_diff_ci(values(a), values(b),
                                                                                      resamples, seed)))
                           for a, b in pairs}
@@ -482,15 +530,23 @@ def run(events: DataFrame, params: als.ALSParams = als.ALSParams(),
         knn_params: item_knn.KNNParams = item_knn.KNNParams(), n_targets: int = DEFAULT_TARGETS,
         validation_day: date = VALID_START, test_day: date = TEST_START, half_lives=HALF_LIVES,
         alphas=ALPHAS, ks=KS, resamples: int = bootstrap.DEFAULT_RESAMPLES,
-        cache_dir: str | None = None, only: str | None = None) -> dict:
+        cache_dir: str | None = None, only: str | None = None, mode: str = "cart") -> dict:
     """Both days and the report. With cache_dir, a day already saved there is read back instead of
     replayed, and a replayed day is saved; only = "validation" or "test" replays that day alone and
     returns its sizes and timings (one Spark process per day keeps the shuffle files of a single day
-    on disk)."""
+    on disk). mode = "cart" or "new" (TARGET_MODES); "new" has no "+self" variants, since it
+    leaves the user:recent products out of every list."""
+    if mode not in TARGET_MODES:
+        raise ValueError(f"mode must be one of {TARGET_MODES}, not {mode!r}")
     started = time.time()
+    sims_run = SIMS if mode == "cart" else BASE_SIMS
+    targets = (f"one {' or '.join(TARGET_EVENTS)} event per user on the day" if mode == "cart" else
+               "one event per user on the day whose product the user has never touched before; every product "
+               f"touched before the target is left out of every list (rec:batch: the ALS top {settings.batch_top_n} "
+               f"without them, out of the top {NEW_BATCH_POOL}; rec:rt: the top {RT_TOP_N} without them)")
     report = {"protocol": {
-        "validation_day": str(validation_day), "test_day": str(test_day),
-        "targets": f"one {' or '.join(TARGET_EVENTS)} event per user on the day, {n_targets or 'all'} users",
+        "mode": mode, "validation_day": str(validation_day), "test_day": str(test_day),
+        "targets": f"{targets}, {n_targets or 'all'} users",
         "batch": "ALS top %d with scores (rec:batch), Item-kNN top %d (sim:item), pop:global, from the events "
                  "before the day" % (settings.batch_top_n, settings.sim_top_n),
         "speed": {"sim:cooc": f"session co-occurrence, last {settings.session_window} distinct products, from "
@@ -513,20 +569,22 @@ def run(events: DataFrame, params: als.ALSParams = als.ALSParams(),
     for name, day in (("validation", validation_day), ("test", test_day)):
         if only and name != only:
             continue
-        saved = load_day(Path(cache_dir) / name) if cache_dir else None
-        days[name] = saved or replay_day(events, day, params, knn_params, n_targets, half_lives, alphas, ks)
-        if cache_dir and not saved:
-            save_day(days[name], Path(cache_dir) / name)
+        path = Path(cache_dir) / (name if mode == "cart" else f"{name}-{mode}") if cache_dir else None
+        saved = load_day(path) if path else None
+        days[name] = saved or replay_day(events, day, params, knn_params, n_targets, half_lives, alphas, ks,
+                                         mode, sims_run)
+        if path and not saved:
+            save_day(days[name], path)
     if only:
         return {"only": only, "data": days[only]["data"], "seconds": days[only]["seconds"]}
     grids = {n: mean_grid(d["names"], metrics_from_ranks(d["ranks"], ks)) for n, d in days.items()}
-    chosen = choose(grids["validation"], "ndcg@10", half_lives, alphas)
+    chosen = choose(grids["validation"], "ndcg@10", half_lives, alphas, sims_run)
     report["chosen_on_validation"] = chosen
     report["validation"] = {"data": days["validation"]["data"], "grid": grids["validation"],
                             "seconds": days["validation"]["seconds"]}
     report["test"] = {"data": days["test"]["data"],
                       **summarise(days["test"], chosen, ks, resamples, params.seed),
-                      "best_on_test": choose(grids["test"], "ndcg@10", half_lives, alphas),
+                      "best_on_test": choose(grids["test"], "ndcg@10", half_lives, alphas, sims_run),
                       "grid": grids["test"], "seconds": days["test"]["seconds"]}
     report["seconds_total"] = round(time.time() - started, 1)
     return report
@@ -553,6 +611,8 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=defaults.seed)
     p.add_argument("--cache-dir", help="save each replayed day here, and reuse a day already saved")
     p.add_argument("--only", choices=("validation", "test"), help="replay this day only (needs --cache-dir)")
+    p.add_argument("--targets-mode", choices=TARGET_MODES, default="cart",
+                   help="cart: a cart or purchase event per user; new: a product the user has never touched")
     args = p.parse_args()
     if args.only and not args.cache_dir:
         p.error("--only needs --cache-dir")
@@ -563,7 +623,7 @@ def main() -> None:
     spark.sparkContext.setCheckpointDir(checkpoint_dir)
     params = als.ALSParams(seed=args.seed)
     report = run(spark.read.parquet(args.input), params, n_targets=args.targets, resamples=args.resamples,
-                 cache_dir=args.cache_dir, only=args.only)
+                 cache_dir=args.cache_dir, only=args.only, mode=args.targets_mode)
     report["input"] = args.input
 
     print(json.dumps(report, indent=2) if args.only else format_report(report))
