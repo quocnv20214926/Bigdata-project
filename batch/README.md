@@ -11,6 +11,9 @@ Raw REES46 CSV -> clean Parquet -> ALS -> Redis. Code here follows the contracts
 | `popularity.py` | Long-term popularity: Popularity baseline, and the lists for `pop:global` / `pop:cat` |
 | `als.py` | Implicit ALS (Spark MLlib) trained on `log(1 + score)`, so its confidence equals `common.weights.als_confidence` |
 | `item_knn.py` | Item-kNN baseline: cosine between product vectors over users (`log(1 + score)`), top 50 neighbours per product |
+| `sim_item.py` | `sim:item`: exact cosine top-50 between ALS item factors (broadcast factors, numpy block product per task) |
+| `rec_batch.py` | Redis budget of the batch keys (1 GiB) and which users get `rec:batch` (most recently active ALS users that fit) |
+| `redis_sizing.py` | Measures Redis memory per key on a live Redis; validation-week coverage of top-50 vs top-100 |
 | `tests/` | Unit tests on tiny data (local Spark, no MinIO needed) |
 
 ## Setup
@@ -19,7 +22,7 @@ PySpark needs Java 17. From the repository root:
 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate
-pip install -r batch/requirements.txt pandas pyarrow pytest
+pip install -r batch/requirements.txt pytest
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)    # macOS
 python -m pytest batch/tests evaluation/tests -q
 ```
@@ -87,3 +90,19 @@ SPARK_DRIVER_MEMORY=14g python -m evaluation.offline --models popularity item_kn
 
 The protocol and the metric definitions are in [`evaluation/README.md`](../evaluation/README.md).
 `--model-out s3a://lake/models/als/` also saves the model for `sim:item`.
+
+## Tune ALS and build sim:item (week 4)
+
+```bash
+# Parameter search on the validation week (fit 10-01..11-08, validate 11-09..11-15), then the best
+# parameters retrained on the full train split, evaluated on test and saved for sim:item
+SPARK_DRIVER_MEMORY=14g python -m evaluation.tune_als --report docs/eval-week04-tuning.json \
+  --final-report docs/eval-week04-als.json --model-out s3a://lake/models/als/week4/
+
+# sim:item from that model, compared with Item-kNN
+SPARK_DRIVER_MEMORY=14g python -m evaluation.similarity --model s3a://lake/models/als/week4/ \
+  --sim-out s3a://lake/models/sim_item/week4/ --report docs/eval-week04-sim.json
+
+# How big rec:batch can be (Redis from infra/compose.base.yml must be running)
+python -m batch.redis_sizing --report docs/redis-sizing-week04.json
+```

@@ -1,0 +1,104 @@
+{
+  "tables": {
+    "sim_item": {
+      "rows": 7771150,
+      "products": 155423,
+      "mean_sim": 0.864318,
+      "neighbours_per_product": 50.0
+    },
+    "item_knn": {
+      "rows": 5408264,
+      "products": 148414,
+      "mean_sim": 0.072364,
+      "neighbours_per_product": 36.44
+    }
+  },
+  "results": {
+    "sim_item": {
+      "same_category@10": 0.65955,
+      "same_category@50": 0.595127,
+      "next_item_transitions": 1000000,
+      "next_item_covered": 1.0,
+      "next_item_hit@10": 0.203491,
+      "next_item_hit@50": 0.392826,
+      "item_based": {
+        "users": 100000,
+        "precision@10": 0.017341,
+        "recall@10": 0.021398,
+        "hit_rate@10": 0.11193,
+        "ndcg@10": 0.023918,
+        "precision@20": 0.015306,
+        "recall@20": 0.036524,
+        "hit_rate@20": 0.16013,
+        "ndcg@20": 0.028112,
+        "coverage@10": 0.268429
+      }
+    },
+    "item_knn": {
+      "same_category@10": 0.884803,
+      "same_category@50": 0.798253,
+      "next_item_transitions": 1000000,
+      "next_item_covered": 0.997628,
+      "next_item_hit@10": 0.285986,
+      "next_item_hit@50": 0.526111,
+      "item_based": {
+        "users": 100000,
+        "precision@10": 0.060587,
+        "recall@10": 0.090303,
+        "hit_rate@10": 0.30222,
+        "ndcg@10": 0.090939,
+        "precision@20": 0.047666,
+        "recall@20": 0.136673,
+        "hit_rate@20": 0.37774,
+        "ndcg@20": 0.10167,
+        "coverage@10": 0.361201
+      }
+    }
+  },
+  "overlap": {
+    "tables": [
+      "sim_item",
+      "item_knn"
+    ],
+    "products_in_both": 148414,
+    "overlap@10": 0.176636,
+    "overlap@50": 0.249031
+  },
+  "seconds": {
+    "sim_item": 28.6,
+    "item_knn": 116.3,
+    "prepare": 63.1,
+    "total": 349.1
+  },
+  "data": {
+    "interactions": {
+      "pairs": 39584014,
+      "users": 4205076,
+      "products": 191909,
+      "density": 4.905e-05
+    },
+    "als_matrix": {
+      "pairs": 38195148,
+      "users": 2890519,
+      "products": 155423,
+      "density": 8.502e-05
+    },
+    "ground_truth": {
+      "users": 100000,
+      "pairs": 1077669
+    },
+    "transitions": 1000000
+  },
+  "params": {
+    "model": "s3a://lake/models/als/week4/",
+    "rank": 128,
+    "neighbours": 50,
+    "block_size": 128,
+    "knn": {
+      "neighbours": 50,
+      "max_items_per_user": 50,
+      "min_common_users": 2
+    }
+  },
+  "input": "s3a://lake/clean/events/"
+}
