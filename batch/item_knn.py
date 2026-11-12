@@ -14,8 +14,9 @@ each user's `max_items_per_user` highest-scored products enter the similarity (p
 user in October: median 3, p99 69; notebooks/01_eda.ipynb, section 6). Scoring uses the full
 history of the evaluated users.
 
-Not to be confused with sim:item (week 4: cosine between ALS item factors) or with Pair 2's
-sim:cooc (co-occurrence within a session).
+Since week 5 this table is also sim:item (batch/nightly.py): it beat the cosine between ALS
+item factors (batch/sim_item.py) on every measure of the week 4 comparison (docs/week-04.md).
+Not to be confused with Pair 2's sim:cooc (co-occurrence within a session).
 """
 
 from __future__ import annotations
