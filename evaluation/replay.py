@@ -439,10 +439,31 @@ def summarise(day: dict, chosen: dict, ks=KS, resamples: int = bootstrap.DEFAULT
     return out
 
 
+def save_day(day: dict, path: Path) -> None:
+    """The ranks of one replayed day (path.npz) and its sizes and timings (path.json)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(path.with_suffix(".npz"), ranks=day["ranks"], group=day["group"].astype(str))
+    path.with_suffix(".json").write_text(json.dumps({"data": day["data"], "seconds": day["seconds"],
+                                                     "names": day["names"]}) + "\n", encoding="utf-8")
+
+
+def load_day(path: Path) -> dict | None:
+    if not (path.with_suffix(".npz").exists() and path.with_suffix(".json").exists()):
+        return None
+    meta = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+    with np.load(path.with_suffix(".npz")) as arrays:
+        return {**meta, "ranks": arrays["ranks"], "group": arrays["group"]}
+
+
 def run(events: DataFrame, params: als.ALSParams = als.ALSParams(),
         knn_params: item_knn.KNNParams = item_knn.KNNParams(), n_targets: int = DEFAULT_TARGETS,
         validation_day: date = VALID_START, test_day: date = TEST_START, half_lives=HALF_LIVES,
-        alphas=ALPHAS, ks=KS, resamples: int = bootstrap.DEFAULT_RESAMPLES) -> dict:
+        alphas=ALPHAS, ks=KS, resamples: int = bootstrap.DEFAULT_RESAMPLES,
+        cache_dir: str | None = None, only: str | None = None) -> dict:
+    """Both days and the report. With cache_dir, a day already saved there is read back instead of
+    replayed, and a replayed day is saved; only = "validation" or "test" replays that day alone and
+    returns its sizes and timings (one Spark process per day keeps the shuffle files of a single day
+    on disk)."""
     started = time.time()
     report = {"protocol": {
         "validation_day": str(validation_day), "test_day": str(test_day),
@@ -465,7 +486,14 @@ def run(events: DataFrame, params: als.ALSParams = als.ALSParams(),
 
     days = {}
     for name, day in (("validation", validation_day), ("test", test_day)):
-        days[name] = replay_day(events, day, params, knn_params, n_targets, half_lives, alphas, ks)
+        if only and name != only:
+            continue
+        saved = load_day(Path(cache_dir) / name) if cache_dir else None
+        days[name] = saved or replay_day(events, day, params, knn_params, n_targets, half_lives, alphas, ks)
+        if cache_dir and not saved:
+            save_day(days[name], Path(cache_dir) / name)
+    if only:
+        return {"only": only, "data": days[only]["data"], "seconds": days[only]["seconds"]}
     grids = {n: mean_grid(d["names"], metrics_from_ranks(d["ranks"], ks)) for n, d in days.items()}
     chosen = choose(grids["validation"], "ndcg@10", half_lives, alphas)
     report["chosen_on_validation"] = chosen
@@ -498,18 +526,23 @@ def main() -> None:
     p.add_argument("--targets", type=int, default=DEFAULT_TARGETS, help="target users per day, 0 = all")
     p.add_argument("--resamples", type=int, default=bootstrap.DEFAULT_RESAMPLES)
     p.add_argument("--seed", type=int, default=defaults.seed)
+    p.add_argument("--cache-dir", help="save each replayed day here, and reuse a day already saved")
+    p.add_argument("--only", choices=("validation", "test"), help="replay this day only (needs --cache-dir)")
     args = p.parse_args()
+    if args.only and not args.cache_dir:
+        p.error("--only needs --cache-dir")
 
     spark = get_spark("batch-replay", s3=not args.no_s3)
     spark.sparkContext.setLogLevel("WARN")
     checkpoint_dir = tempfile.mkdtemp(prefix="als-checkpoint-")
     spark.sparkContext.setCheckpointDir(checkpoint_dir)
     params = als.ALSParams(seed=args.seed)
-    report = run(spark.read.parquet(args.input), params, n_targets=args.targets, resamples=args.resamples)
+    report = run(spark.read.parquet(args.input), params, n_targets=args.targets, resamples=args.resamples,
+                 cache_dir=args.cache_dir, only=args.only)
     report["input"] = args.input
 
-    print(format_report(report))
-    if args.report:
+    print(json.dumps(report, indent=2) if args.only else format_report(report))
+    if args.report and not args.only:
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     spark.stop()

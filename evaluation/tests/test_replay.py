@@ -223,3 +223,30 @@ def test_replay_end_to_end(spark):
 
 def format_lines(report):
     return replay.format_report(report).count("\n") + 1
+
+
+def test_days_saved_and_reused(tmp_path):
+    names = replay.variant_names((1800,), (0.5,))
+    rng = np.random.default_rng(7)
+
+    def fake_day(n):
+        return {"data": {"targets": n}, "seconds": {"als_train": 1.0}, "names": names,
+                "ranks": rng.integers(0, 21, size=(n, len(names))).astype(np.int16),
+                "group": np.array(["both", "neither"] * (n // 2))}
+
+    days = {"validation": fake_day(40), "test": fake_day(30)}
+    for name, day in days.items():
+        replay.save_day(day, tmp_path / name)
+    back = replay.load_day(tmp_path / "test")
+    assert back["names"] == names and back["data"] == {"targets": 30}
+    assert (back["ranks"] == days["test"]["ranks"]).all() and list(back["group"]) == list(days["test"]["group"])
+    assert replay.load_day(tmp_path / "missing") is None
+
+    # both days on disk: no Spark, no events needed
+    part = replay.run(None, ALSParams(), cache_dir=str(tmp_path), only="test", half_lives=(1800,), alphas=(0.5,))
+    assert part == {"only": "test", "data": {"targets": 30}, "seconds": {"als_train": 1.0}}
+    report = replay.run(None, ALSParams(), cache_dir=str(tmp_path), half_lives=(1800,), alphas=(0.5,), resamples=50)
+    grid = replay.mean_grid(names, replay.metrics_from_ranks(days["validation"]["ranks"]))
+    assert report["chosen_on_validation"] == replay.choose(grid, "ndcg@10", (1800,), (0.5,))
+    assert report["test"]["data"] == {"targets": 30} and report["test"]["groups"]["both"]["targets"] == 15
+    json.dumps(report)
