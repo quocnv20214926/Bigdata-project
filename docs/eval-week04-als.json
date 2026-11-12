@@ -1,0 +1,101 @@
+{
+  "protocol": {
+    "train": [
+      "2019-10-01",
+      "2019-11-15"
+    ],
+    "test": [
+      "2019-11-16",
+      "2019-11-30"
+    ],
+    "truth_events": [
+      "view",
+      "cart",
+      "purchase"
+    ],
+    "eval_users_requested": 100000,
+    "filter": {
+      "min_users_per_product": 5,
+      "min_products_per_user": 2
+    },
+    "ks": [
+      10,
+      20
+    ],
+    "models": [
+      "popularity",
+      "als"
+    ]
+  },
+  "als_params": {
+    "rank": 128,
+    "reg_param": 0.1,
+    "alpha": 5.0,
+    "max_iter": 10,
+    "seed": 42,
+    "checkpoint_interval": 1
+  },
+  "knn_params": {
+    "neighbours": 50,
+    "max_items_per_user": 50,
+    "min_common_users": 2
+  },
+  "data": {
+    "interactions": {
+      "pairs": 39584014,
+      "users": 4205076,
+      "products": 191909,
+      "density": 4.905e-05
+    },
+    "als_matrix": {
+      "pairs": 38195148,
+      "users": 2890519,
+      "products": 155423,
+      "density": 8.502e-05
+    },
+    "ground_truth": {
+      "users": 100000,
+      "pairs": 1077669
+    }
+  },
+  "results": {
+    "popularity": {
+      "users": 100000,
+      "precision@10": 0.040589,
+      "recall@10": 0.076663,
+      "hit_rate@10": 0.2595,
+      "ndcg@10": 0.069064,
+      "precision@20": 0.030891,
+      "recall@20": 0.107438,
+      "hit_rate@20": 0.3165,
+      "ndcg@20": 0.076449,
+      "coverage@10": 6.4e-05
+    },
+    "als": {
+      "users": 100000,
+      "precision@10": 0.06599,
+      "recall@10": 0.115629,
+      "hit_rate@10": 0.35355,
+      "ndcg@10": 0.120618,
+      "precision@20": 0.046881,
+      "recall@20": 0.149458,
+      "hit_rate@20": 0.4115,
+      "ndcg@20": 0.125834,
+      "coverage@10": 0.012952
+    }
+  },
+  "seconds": {
+    "interactions": 54.0,
+    "popularity": 0.1,
+    "als_train": 1346.0,
+    "als_recommend": 118.9,
+    "evaluate_popularity": 11.5,
+    "evaluate_als": 16.2,
+    "total": 1546.6
+  },
+  "input": "s3a://lake/clean/events/",
+  "tuning": {
+    "report": "docs/eval-week04-tuning.json",
+    "validation_ndcg@10": 0.127305
+  }
+}

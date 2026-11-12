@@ -34,8 +34,8 @@ The system is built as **two independent pipelines** that both read the raw data
 ```
                 ┌──────────────── BATCH PIPELINE (Pair 1, nightly, Airflow) ──────────┐
            ┌──► │ S3/MinIO (raw) → PySpark ETL → Parquet (clean, by date)             │
-           │    │   ├─ Implicit ALS → rec:batch (top-100 per user)                    │
-           │    │   ├─ Item-item similarity on ALS factors → sim:item                 │
+           │    │   ├─ Implicit ALS → rec:batch (most recently active users)          │
+           │    │   ├─ Item-kNN similarity (cosine over users) → sim:item             │
            │    │   └─ Long-term popularity → pop:cat, pop:global                     │
            │    └───────────────────────────────┬─────────────────────────────────────┘
 REES46 CSV │                                    ▼ (bulk load)
@@ -60,12 +60,12 @@ Each key has exactly one writer pipeline. The authoritative definition is `commo
 
 | Key | Type | Writer | TTL | Value |
 |---|---|---|---|---|
-| `rec:batch:{user_id}` | ZSET | Batch | Overwritten nightly | product → ALS score |
+| `rec:batch:{user_id}` | ZSET | Batch | Overwritten nightly | top-50 product → ALS score, for the most recently active users that fit the Redis budget |
 | `sim:item:{product_id}` | ZSET | Batch | Overwritten nightly | top-50 product → cosine similarity |
 | `pop:cat:{category_id}`, `pop:global` | ZSET | Batch | Overwritten nightly | product → long-term popularity |
 | `meta:batch:last_run` | STRING | Batch | none | timestamp of last load |
-| `user:recent:{user_id}` | LIST | Speed | 24h | last 20 events, `product_id\|event_type\|epoch` |
-| `user:bought:{user_id}` | SET | Speed | 30 days | purchased products |
+| `user:recent:{user_id}` | ZSET | Speed | 24h | last 20 events, member `product_id\|event_type\|epoch`, score = epoch |
+| `user:bought:{user_id}` | ZSET | Speed | 30 days | purchased products, score = purchase epoch |
 | `rec:rt:{user_id}` | ZSET | Speed | 6h | product → real-time score |
 | `sim:cooc:{product_id}` | ZSET | Speed | 7 days | top-50 product → normalized co-occurrence |
 | `trend:cat:{category_id}`, `trend:global` | ZSET | Speed | 1h | product → weighted count in last hour |
@@ -74,10 +74,10 @@ Each key has exactly one writer pipeline. The authoritative definition is `commo
 
 | | `sim:cooc` (speed) | `sim:item` (batch) |
 |---|---|---|
-| Method | Count of products viewed in the same session (within the last 10 items), normalized: `cooc(i, j) / sqrt(cnt(i) · cnt(j))` | Cosine similarity between ALS item factors |
+| Method | Count of products viewed in the same session (within the last 10 items), normalized: `cooc(i, j) / sqrt(cnt(i) · cnt(j))` | Cosine between products over the users who interacted with them in the training window (Item-kNN, weights `log(1 + score)`, at least 2 users in common). Chosen in week 4 over the cosine of ALS item factors, which scored lower on every measure ([week-04.md](week-04.md)) |
 | Update | Continuously, per event | Nightly |
-| Strength | Simple; captures new products and trends immediately | Learns latent relations between products never viewed together |
-| Weakness | Noisy for rarely viewed products; only direct relations | New products wait for the next training run |
+| Strength | Simple; captures new products and trends immediately | Uses each user's whole history, so it links products seen in different sessions or weeks apart |
+| Weakness | Noisy for rarely viewed products; only direct relations | New products wait for the next nightly run; products sharing fewer than 2 users with any other get no list |
 
 The speed layer uses `sim:cooc` by default, so it does not depend on the batch layer. After integration, `sim:item` is added and the three variants (cooc / item / hybrid) are compared.
 
@@ -163,9 +163,9 @@ The team works in 2 fixed pairs, each owning one pipeline. The detailed weekly a
 ### Week 1: Project Setup
 - [x] Create repository structure, README, and plan
 - [x] Draft shared contracts in `common/`
-- [ ] Write the three Docker Compose files in `infra/`
-- [ ] Download the dataset into `data/raw/`, verify columns and event types
-- [ ] Initialize the git repository
+- [x] Write the three Docker Compose files in `infra/`
+- [x] Download the dataset into `data/raw/`, verify columns and event types
+- [x] Initialize the git repository
 
 ### Weeks 2–10: Summary
 
@@ -204,7 +204,7 @@ The team works in 2 fixed pairs, each owning one pipeline. The detailed weekly a
 ## 9. Success Criteria
 
 - [ ] End-to-end run with a single Docker Compose command
-- [ ] ALS beats the Popularity baseline on NDCG@10
+- [x] ALS beats the Popularity baseline on NDCG@10 (week 3: 0.1158 vs 0.0691, `docs/week-03.md`)
 - [ ] Batch + speed beats batch-only on Hit Rate@10, especially for new users
 - [ ] API reaches p95 < 100ms at the target load
 - [ ] Batch job runs automatically via Airflow, with a monitoring dashboard

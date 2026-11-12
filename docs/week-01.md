@@ -2,7 +2,42 @@
 
 ## Pair 1: Batch 
 
-_Written by Pair 1._
+_Completed on 2026-10-27, after week 3; the check in section 3 was run on that date._
+
+### 1. Weekly goals
+
+- With the whole team: repository structure, project plan and draft contracts in `common/`.
+- Infrastructure for the batch pipeline: Spark and Airflow in `infra/compose.batch.yml`, MinIO as the data lake.
+- Both months of raw data (October and November 2019) available for the EDA and the ETL.
+
+### 2. Completed work
+
+| Task | Files | Status |
+|---|---|---|
+| Repository, plan, draft contracts (whole team) | `docs/plan.md`, `docs/assignment.md`, `common/` | Done in week 1; contracts frozen in week 2 (`CONTRACT_VERSION` 1.0.0) |
+| MinIO with one-shot bucket creation (`lake`), behind compose profile `lake` (whole team) | `infra/compose.base.yml` | Done in week 1 |
+| Raw data: `2019-Oct.csv` (5.7 GB) and `2019-Nov.csv` (9.0 GB) in `data/raw/` | `data/raw/` (not in git) | Done; header and event types checked for October in `docs/data-check-oct.json`, both months read by the ETL in week 2 (`docs/etl-report.json`) |
+| Spark master/worker and Airflow | `infra/compose.batch.yml` | Delivered in week 2 (PR #5) |
+
+### 3. Results / metrics
+
+| Check | Result |
+|---|---|
+| `docker compose --profile lake -f infra/compose.base.yml up -d minio minio-init` | `minio` running; `minio-init` exited with code 0 ("bucket lake ready") |
+| Bucket `lake` | 63 objects, 18.3 GB: the 2 raw CSV files and one clean Parquet partition per day (61 `event_date` folders, 2019-10-01 to 2019-11-30) |
+| Raw rows read by the ETL (both months) | 109,950,743, none invalid |
+
+### 4. Issues & resolutions
+
+| Issue | Resolution |
+|---|---|
+| Docker Hub removed `minio/minio` and `minio/mc` | Pair 2 switched to `cgr.dev/chainguard/minio` and `amazon/aws-cli` (Pair 2 section below); MinIO has no in-container healthcheck, so `minio-init` waiting for the S3 API is the readiness signal |
+| `infra/compose.batch.yml` was not ready in week 1 | Written at the start of week 2, before the ETL that needs it |
+
+### 5. Plan for next week
+
+- Freeze the contracts in `common/` with Pair 2.
+- A: EDA on the raw data. B: ETL to clean Parquet on MinIO and the time-based train/test split.
 
 ## Pair 2: Real-time 
 ### 1. Weekly goals
@@ -45,7 +80,7 @@ Implications for the real-time pipeline:
 - Replay rates: `--speed 60` ≈ 950 events/s, `--speed 600` ≈ 9,500 events/s on average.
 - Full scan took 1,737 s (≈ 24,400 rows/s); full report in `docs/data-check-oct.json`.
 
-Infrastructure check (`docker compose ... ps`): `redis` and `kafka` healthy; `kafka-ui`, `api`, `streaming` running. `kafka-init` exited with code 0 (topic `events` created, 6 partitions). MinIO (`--profile lake`, used by Pair 1): [TO FILL after `dc --profile lake up -d`]
+Infrastructure check (`docker compose ... ps`): `redis` and `kafka` healthy; `kafka-ui`, `api`, `streaming` running. `kafka-init` exited with code 0 (topic `events` created, 6 partitions). MinIO (`--profile lake`, used by Pair 1): `minio` running, `minio-init` exited with code 0 and bucket `lake` exists (checked by Pair 1 on 2026-10-27).
 
 ### 4. Issues & resolutions
 

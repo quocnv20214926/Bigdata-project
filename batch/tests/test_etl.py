@@ -11,7 +11,7 @@ import pytest
 
 from batch.etl import count_drops, run
 from batch.spark_session import get_spark
-from batch.split import split
+from batch.split import FIT_END, VALID_START, split, validation_split
 from common.schemas import CLEAN_PARTITION_COLUMN, RAW_COLUMNS
 
 ROWS = [
@@ -82,6 +82,14 @@ def test_split_boundaries_and_cold_start(spark, raw_csv, tmp_path):
     assert s["test"]["users"] == 2
     assert s["test_users_not_in_train"] == 1      # 550050854 only appears in test
     assert s["test_buyers"] == 1 and s["test_buyers_not_in_train"] == 0
+
+
+def test_validation_week_is_the_end_of_train(spark):
+    days = [date(2019, 10, 1), FIT_END, VALID_START, date(2019, 11, 15), date(2019, 11, 16)]
+    df = spark.createDataFrame([(d,) for d in days], [CLEAN_PARTITION_COLUMN])
+    fit, valid = validation_split(df)
+    assert sorted(r[0] for r in fit.collect()) == [date(2019, 10, 1), date(2019, 11, 8)]
+    assert sorted(r[0] for r in valid.collect()) == [date(2019, 11, 9), date(2019, 11, 15)]   # no test day
 
 
 def test_rerun_replaces_only_its_dates(spark, raw_csv, tmp_path):

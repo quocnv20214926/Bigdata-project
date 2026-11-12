@@ -1,0 +1,99 @@
+{
+  "budget_mb": {
+    "rec:batch": 860.0,
+    "sim:item": 150.0,
+    "pop": 14.0
+  },
+  "formula": {
+    "key_bytes": 72,
+    "entry_bytes": 15.2,
+    "score_decimals": 4
+  },
+  "measured": {
+    "redis_version": "8.10.2",
+    "keys_per_size": 5000,
+    "sizes": {
+      "20_rounded": {
+        "members": 20,
+        "bytes_per_key": 383,
+        "memory_usage_per_key": 313,
+        "formula": 376,
+        "encoding": "listpack"
+      },
+      "20_raw": {
+        "members": 20,
+        "bytes_per_key": 689,
+        "memory_usage_per_key": 559,
+        "formula": null,
+        "encoding": "listpack"
+      },
+      "50_rounded": {
+        "members": 50,
+        "bytes_per_key": 831,
+        "memory_usage_per_key": 715,
+        "formula": 832,
+        "encoding": "listpack"
+      },
+      "50_raw": {
+        "members": 50,
+        "bytes_per_key": 1585,
+        "memory_usage_per_key": 1329,
+        "formula": null,
+        "encoding": "listpack"
+      },
+      "100_rounded": {
+        "members": 100,
+        "bytes_per_key": 1597,
+        "memory_usage_per_key": 1384,
+        "formula": 1592,
+        "encoding": "listpack"
+      },
+      "100_raw": {
+        "members": 100,
+        "bytes_per_key": 3109,
+        "memory_usage_per_key": 2613,
+        "formula": null,
+        "encoding": "listpack"
+      }
+    }
+  },
+  "coverage": {
+    "fit_end": "2019-11-08",
+    "validation": [
+      "2019-11-09",
+      "2019-11-15"
+    ],
+    "als_users": 2465378,
+    "als_users_active_in_last_days": {
+      "1": 237218,
+      "3": 569086,
+      "7": 1023491,
+      "14": 1458800,
+      "30": 2203076
+    },
+    "all_als_users_top_100_mb": 3743.1,
+    "validation_returning_als_users": 723348,
+    "validation_intent_events": 1118611,
+    "intent_events_by_als_users": 0.6946,
+    "options": {
+      "top_50": {
+        "top_n": 50,
+        "users": 1083864,
+        "estimated_mb": 860.0,
+        "oldest_last_event": "2019-11-01 14:16:53",
+        "returning_users_covered": 0.6617,
+        "intent_events_covered": 0.5431
+      },
+      "top_100": {
+        "top_n": 100,
+        "users": 566441,
+        "estimated_mb": 860.0,
+        "oldest_last_event": "2019-11-06 09:26:48",
+        "returning_users_covered": 0.4015,
+        "intent_events_covered": 0.3797
+      }
+    }
+  },
+  "choice": "top_50",
+  "seconds": 47.9
+}

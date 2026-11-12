@@ -27,6 +27,9 @@ def get_spark(app_name: str, master: str | None = None, driver_memory: str | Non
         .config("spark.sql.session.timeZone", "UTC")
         # Re-running one month only replaces that month's event_date partitions.
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
+        # Shuffle files are deleted only after the driver garbage-collects their references;
+        # the default 30 min lets ALS iterations pile up tens of GB on disk.
+        .config("spark.cleaner.periodicGC.interval", "1min")
     )
     if os.getenv("SPARK_IVY_DIR"):
         builder = builder.config("spark.jars.ivy", os.environ["SPARK_IVY_DIR"])
