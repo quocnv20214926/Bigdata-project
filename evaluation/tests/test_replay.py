@@ -138,6 +138,19 @@ def test_realtime_scores_follow_propagate(spark):
             assert got[(tid, hl)] == pytest.approx(top)
 
 
+def test_self_adds_the_recent_products(spark):
+    recent = spark.createDataFrame([(0, 1, "view", 600), (0, 2, "cart", 3600)],
+                                   ["target_id", "product_id", "event_type", "age"])
+    sims = spark.createDataFrame([(1, 5, 0.5), (2, 5, 1.0)], ["product_id", "neighbour_id", "sim"])
+    got = {r["product_id"]: r["score"]
+           for r in replay.realtime_scores(recent, replay.with_self(sims, recent), half_lives=(1800,)).collect()}
+    ref = Counter()
+    for i, e, age in [(1, "view", 600), (2, "cart", 3600)]:
+        ref.update(propagate(e, {**{j: s for p, j, s in [(1, 5, 0.5), (2, 5, 1.0)] if p == i}, i: 1.0}, age, 1800))
+    assert got == pytest.approx(dict(ref))
+    assert set(got) == {1, 2, 5}
+
+
 def test_rank_variants_uses_the_api_merge():
     import pandas as pd
 
@@ -208,10 +221,10 @@ def test_replay_end_to_end(spark):
     assert test["data"]["target_events"] == {"cart": 40}
     assert test["data"]["groups"]["both"] == 40                  # every user has rec:batch and user:recent
     assert test["data"]["with_bought"] == 40                     # product 99
-    assert len(test["grid"]) == 2 + 3 * 2 * (1 + 2)
+    assert len(test["grid"]) == 2 + 6 * 2 * (1 + 2)
+    assert test["data"]["target_in_recent"] == 40                 # each pair was viewed together in October
     chosen = report["chosen_on_validation"]
-    assert set(chosen) == {"speed:cooc", "speed:item", "speed:hybrid", "hybrid:cooc", "hybrid:item",
-                           "hybrid:hybrid", "hybrid"}
+    assert set(chosen) == {f"{kind}:{s}" for kind in ("speed", "hybrid") for s in replay.SIMS} | {"hybrid"}
     v = test["variants"]
     # the viewed product's pair partner is its strongest co-occurrence: rank 1 for speed with sim:cooc
     assert v["speed:cooc"]["hit_rate@10"]["mean"] == 1.0

@@ -19,9 +19,10 @@ For a cutoff day C, the morning after a nightly run:
       rec:rt       common.scoring.propagate of every user:recent event through a similarity table,
                    decayed to the target time, top 50;
   - targets: one cart or purchase event per user on day C, for a sample of users;
-  - variants: popularity only; batch only; speed only (cooc, item or hybrid similarity, four
-    half-lives); batch + speed with alpha 0.1 .. 0.9. Each is ranked by common.scoring.merge_scores
-    (what the API runs), without the user:bought products, and completed with pop:global;
+  - variants: popularity only; batch only; speed only (cooc, item or hybrid similarity, each also
+    "+self", with the user:recent products themselves added to rec:rt; five half-lives); batch +
+    speed with alpha 0.1 .. 0.95. Each is ranked by common.scoring.merge_scores (what the API
+    runs), without the user:bought products, and completed with pop:global;
   - hit@k and ndcg@k of the target product (one relevant product per target).
 
 Alpha, the half-life and the similarity are chosen on the validation day (11-09, models trained on
@@ -60,9 +61,13 @@ from evaluation import bootstrap
 
 TARGET_EVENTS = ("cart", "purchase")
 DEFAULT_TARGETS = 30_000
-SIMS = ("cooc", "item", "hybrid")
-ALPHAS = tuple(round(0.1 * i, 1) for i in range(1, 10))
-HALF_LIVES = (300, DEFAULT_HALF_LIFE_SECONDS, 7200, 43200)     # 5 min, 30 min (default), 2 h, 12 h
+BASE_SIMS = ("cooc", "item", "hybrid")
+# "+self": the same table plus sim(i, i) = 1 for the user:recent products, so rec:rt also holds the
+# products the user has just viewed, not only their neighbours (common.scoring.propagate leaves them out)
+SELF_SUFFIX = "+self"
+SIMS = BASE_SIMS + tuple(s + SELF_SUFFIX for s in BASE_SIMS)
+ALPHAS = tuple(round(0.1 * i, 1) for i in range(1, 10)) + (0.95,)
+HALF_LIVES = (300, DEFAULT_HALF_LIFE_SECONDS, 7200, 43200, 86400)  # 5 min, 30 min (default), 2 h, 12 h, 24 h
 KS = (10, 20)
 HYBRID_ITEM_WEIGHT = 0.5        # hybrid sim(i, j) = 0.5 * sim:item + 0.5 * sim:cooc
 RT_TOP_N = settings.batch_top_n
@@ -216,6 +221,13 @@ def realtime_scores(recent: DataFrame, sims: DataFrame, half_lives=HALF_LIVES, t
     return long.withColumn("pos", F.row_number().over(order)).where(F.col("pos") <= top_n).drop("pos")
 
 
+def with_self(sims: DataFrame, recent: DataFrame) -> DataFrame:
+    """The similarity table plus (i, i, 1.0) for every product in user:recent."""
+    own = recent.select("product_id").distinct()
+    return sims.select("product_id", "neighbour_id", "sim").unionByName(
+        own.select("product_id", F.col("product_id").alias("neighbour_id"), F.lit(1.0).alias("sim")))
+
+
 # ---- ranking the variants (plain Python, the API's merge) ----------------------------------------
 
 def final_list(merged, fallback, exclude, k: int) -> list[int]:
@@ -365,7 +377,7 @@ def replay_day(events: DataFrame, cutoff: date, params: als.ALSParams, knn_param
     builders = {"item": lambda: item_knn.similarities(matrix, knn_params),
                 "cooc": lambda: cooc_similarities(cooc_counts(history)),
                 "hybrid": lambda: hybrid_similarities(sims["item"], sims["cooc"])}
-    for s in SIMS:
+    for s in BASE_SIMS:
         t = time.time()
         sims[s] = builders[s]().cache()
         data["similarity"][s] = sims[s].agg(F.count("*").alias("pairs"),
@@ -381,13 +393,21 @@ def replay_day(events: DataFrame, cutoff: date, params: als.ALSParams, knn_param
     for r in bought_df.collect():
         bought.setdefault(int(r["target_id"]), set()).add(int(r["product_id"]))
     tpdf = targets.select("target_id", "user_id", "product_id").toPandas().sort_values("target_id")
-    with_recent = set(recent.select("target_id").distinct().toPandas()["target_id"].astype(int).tolist())
+    recent_pairs = recent.select("target_id", "product_id").distinct().toPandas()
+    with_recent = set(recent_pairs["target_id"].astype(int).tolist())
+    in_recent = set(zip(recent_pairs["target_id"].astype(int).tolist(), recent_pairs["product_id"].astype(int).tolist()))
+    rows = list(zip(tpdf["target_id"].tolist(), tpdf["user_id"].tolist(), tpdf["product_id"].tolist()))
+    # how often the product of the target event is already in user:recent, or in the user's rec:batch
+    data["target_in_recent"] = sum((tid, p) in in_recent for tid, _, p in rows)
+    data["target_in_rec_batch"] = sum(p in batch.get(u, {}) for _, u, p in rows)
+    del recent_pairs, in_recent, rows
     timings["speed_state"] = round(time.time() - t, 1)
 
     names, columns = [], []
     for s in SIMS:                     # one similarity at a time: its rec:rt lists, then its variants
         t = time.time()
-        scores = realtime_scores(recent, sims[s], half_lives).toPandas()
+        table = sims[s] if s in sims else with_self(sims[s.removesuffix(SELF_SUFFIX)], recent)
+        scores = realtime_scores(recent, table, half_lives).toPandas()
         rt = {(s, hl): to_dicts(scores[scores["half_life"] == hl], "target_id") for hl in half_lives}
         del scores
         timings[f"rt_{s}"] = round(time.time() - t, 1)
@@ -427,6 +447,9 @@ def summarise(day: dict, chosen: dict, ks=KS, resamples: int = bootstrap.DEFAULT
     pairs = [("hybrid", "batch"), ("hybrid", "popularity"), ("batch", "popularity")]
     pairs += [(f"hybrid:{s}", f"speed:{s}") for s in SIMS] + [(f"hybrid:{s}", "batch") for s in SIMS]
     pairs += [("speed:item", "speed:cooc"), ("speed:hybrid", "speed:cooc"), ("hybrid:item", "hybrid:cooc")]
+    pairs += [(f"speed:{s}{SELF_SUFFIX}", f"speed:{s}") for s in BASE_SIMS]
+    pairs += [(f"speed:{s}{SELF_SUFFIX}", "popularity") for s in BASE_SIMS]
+    pairs += [(f"hybrid:{s}{SELF_SUFFIX}", f"hybrid:{s}") for s in BASE_SIMS]
     out["differences"] = {f"{a} - {b}": dict(zip(metric_names, bootstrap.paired_diff_ci(values(a), values(b),
                                                                                      resamples, seed)))
                           for a, b in pairs}
@@ -476,7 +499,9 @@ def run(events: DataFrame, params: als.ALSParams = als.ALSParams(),
                                  f"{rk.TTL['user:recent'] // 3600} h old",
                   "user:bought": "products bought before the target, removed from every list",
                   "rec:rt": f"common.scoring.propagate through the similarity, decayed to the target time, top {RT_TOP_N}",
-                  "hybrid similarity": f"{HYBRID_ITEM_WEIGHT} * sim:item + {1 - HYBRID_ITEM_WEIGHT} * sim:cooc"},
+                  "hybrid similarity": f"{HYBRID_ITEM_WEIGHT} * sim:item + {1 - HYBRID_ITEM_WEIGHT} * sim:cooc",
+                  "+self": "the same similarity plus sim(i, i) = 1 for the user:recent products, so rec:rt "
+                           "also holds the products just viewed"},
         "merge": "common.scoring.merge_scores (min-max per source, alpha * batch + (1 - alpha) * rt), completed "
                  "with pop:global",
         "half_lives": list(half_lives), "alphas": list(alphas), "ks": list(ks),

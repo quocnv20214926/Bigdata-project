@@ -106,10 +106,14 @@ functions of `common/scoring.py` that it will use.
 | `sim:cooc` | counted as `streaming/sinks/cooc.py` does (last 10 distinct products of a session, `cooc / sqrt(cnt_i * cnt_j)`, clipped at 1, top 50), from the events before the day, so frozen like `sim:item`; a test checks the counts and similarities against the streaming code |
 | `user:recent`, `user:bought` | the user's 20 newest events before the target, if the newest is under 24 h old; the products bought before it, if the last purchase is under 30 days old |
 | `rec:rt` | `rt[j] = sum of w_e * sim(i, j) * exp(-ln 2 * age / half_life)` over the `user:recent` events (`common.scoring.propagate`), top 50 |
-| Variants | popularity only; batch only; speed only; batch + speed for alpha 0.1 .. 0.9; each with similarity cooc, item or hybrid (0.5 * item + 0.5 * cooc) and half-life 5 min, 30 min, 2 h or 12 h. Lists come from `merge_scores` (min-max per source; alpha 1 without `rec:rt`, 0 without `rec:batch`), without `user:bought`, completed with `pop:global` |
+| Variants | popularity only; batch only; speed only; batch + speed for alpha 0.1 .. 0.9 and 0.95; each with similarity cooc, item or hybrid (0.5 * item + 0.5 * cooc), each also "+self" (sim(i, i) = 1 added for the `user:recent` products, so `rec:rt` holds the products just viewed, which `propagate` leaves out), and half-life 5 min, 30 min, 2 h, 12 h or 24 h. Lists come from `merge_scores` (min-max per source; alpha 1 without `rec:rt`, 0 without `rec:batch`), without `user:bought`, completed with `pop:global` |
 | Selection | for each similarity, the half-life (speed only) and the half-life and alpha (batch + speed) with the best NDCG@10 on the validation day; the test day reports those with 95% bootstrap intervals over targets and paired differences, plus the whole grid |
-| Groups | targets whose user has `rec:batch` and `user:recent`, only one of them, or neither |
+| Groups | targets whose user has `rec:batch` and `user:recent`, only one of them, or neither; the report also counts the targets whose product is already in `user:recent` or in `rec:batch` |
 
 ```bash
-SPARK_DRIVER_MEMORY=14g python -m evaluation.replay --report docs/eval-week08-replay.json
+SPARK_DRIVER_MEMORY=14g python -m evaluation.replay --report docs/eval-week08-replay.json --cache-dir /tmp/replay-days
+# one Spark process per day (less disk for shuffle files), then the report from the two saved days
+python -m evaluation.replay --cache-dir /tmp/replay-days --only validation
+python -m evaluation.replay --cache-dir /tmp/replay-days --only test
+python -m evaluation.replay --cache-dir /tmp/replay-days --report docs/eval-week08-replay.json
 ```
