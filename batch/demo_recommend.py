@@ -249,11 +249,15 @@ def price(products, product_id: int) -> str:
     return f"{value:.2f}" if isinstance(value, (int, float)) and not math.isnan(value) else ""
 
 
+def plural(n: int, word: str) -> str:
+    return f"{n} {word}" + ("" if n == 1 else "s")
+
+
 def event_summary(events: list[dict]) -> str:
     c = Counter(e["event_type"] for e in events)
     products = len({e["product_id"] for e in events})
     kinds = ", ".join(f"{t} {c[t]}" for t in ("view", "cart", "purchase") if c[t])
-    return f"{len(events)} events, {products} products" + (f" ({kinds})" if kinds else "")
+    return f"{plural(len(events), 'event')}, {plural(products, 'product')}" + (f" ({kinds})" if kinds else "")
 
 
 def render(demo: UserDemo, products, k: int, as_of: date, until: date, recent: int = 8) -> str:
@@ -264,20 +268,21 @@ def render(demo: UserDemo, products, k: int, as_of: date, until: date, recent: i
         f"  history before {as_of}: {event_summary(demo.history)}",
         f"  test period {as_of}..{until}: {event_summary(demo.test)}",
         f"  rec:batch: {'yes' if demo.has_rec_batch else 'no (the API falls back to popularity)'}",
+        f"  popularity list: {demo.pop_key}"
+        + (" (main category of the history)" if demo.pop_key != rk.POP_GLOBAL else ""),
         f"  latest history events, UTC (newest first, up to {recent}):",
     ]
     for e in reversed(demo.history[-recent:]):
         p = int(e["product_id"])
         lines.append(f"    {e['time']}  {e['event_type']:<8} {p:>9}  "
-                     f"{label(products, p)[:30]:<30} {price(products, p):>8}")
+                     f"{label(products, p)[:30]:<30} {price(products, p):>8}".rstrip())
     if not demo.history:
         lines.append("    (none: a new user)")
 
     width = 34
     names = list(demo.lists)
-    heads = [n if n != "Popularity" else f"Popularity ({demo.pop_key})" for n in names]
     lines.append("")
-    lines.append(("   #  " + "  ".join(f"{h[:width]:<{width}}" for h in heads)).rstrip())
+    lines.append(("   #  " + "  ".join(f"{n[:width]:<{width}}" for n in names)).rstrip())
     for i in range(max((len(rows) for rows in demo.lists.values()), default=0)):
         cells = []
         for n in names:

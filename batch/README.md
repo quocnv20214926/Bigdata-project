@@ -164,10 +164,12 @@ written to `data/batch-runs/<run-id>/<step>.json`.
 broadcast once, each Spark task multiplies blocks of 128 users by them and keeps the top k with
 `argpartition` (`als.recommend`; the old path stays as `als.recommend_builtin`, and a test checks both
 give the same lists). `train` now also saves the filtered interaction matrix (`matrix/`), so `sim`
-reuses it instead of rebuilding it from the events. Knobs for the timing experiments:
+reuses it instead of rebuilding it from the events. ALS now runs 5 iterations instead of 10: on the
+laptop the full nightly run dropped from 44 to 21 minutes with NDCG@10 slightly higher
+(`docs/week-06.md`). Knobs for timing experiments (more blocks and Kryo were slower in local mode):
 
 ```bash
-python -m batch.nightly train --run-id $run --iter 8 --als-blocks 20 --checkpoint-interval 4
+python -m batch.nightly train --run-id $run --iter 10 --als-blocks 20 --checkpoint-interval 4
 SPARK_EXTRA_CONF="spark.serializer=org.apache.spark.serializer.KryoSerializer" python -m batch.nightly train --run-id $run
 ```
 

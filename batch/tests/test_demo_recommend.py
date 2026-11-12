@@ -127,6 +127,8 @@ def test_render_and_json_without_product_table():
     d = demo.build(redis_with_batch(), 7, [ev("view", 1, 9)], [ev("purchase", 100)], k=3)
     text = demo.render(d, None, 3, date(2019, 11, 16), date(2019, 11, 30))
     assert "User 7" in text and "rec:batch: yes" in text and "P*" not in text
+    assert "popularity list: pop:cat:9 (main category of the history)" in text
+    assert "1 event, 1 product (view 1)" in text
     assert "    100 ?" in text and "hits 1, NDCG@3 1.000" in text
     out = demo.to_json(d, None, 3)
     assert out["lists"]["ALS"][0] == {"product_id": 100, "score": 0.9, "label": "?", "test_event": "P"}

@@ -6,6 +6,9 @@ the formula in docs/plan.md section 3.3.
 
 The default parameters are the best of the week 4 search on the validation week
 (evaluation/tune_als.py, docs/eval-week04-tuning.json): rank 128, regParam 0.1, alpha 5.
+Week 6 cut the iterations from 10 to 5: half the training time, and NDCG@10 a little higher on
+both the validation week (0.1298 vs 0.1273) and the test split (0.1226 vs 0.1206)
+(docs/eval-week06-iter5.json, docs/eval-week06-als-iter5.json).
 
 REES46 user_id and product_id fit in a 32-bit int, which Spark ALS requires;
 it raises an error if an id does not.
@@ -37,7 +40,7 @@ class ALSParams:
     rank: int = 128
     reg_param: float = 0.1
     alpha: float = 5.0      # week 3 used common.weights.DEFAULT_ALS_ALPHA (10)
-    max_iter: int = 10
+    max_iter: int = 5       # weeks 3 to 5 used 10 (docs/week-06.md)
     seed: int = 42
     # With a checkpoint dir set, factors are saved every N iterations; this cuts the lineage
     # so Spark can delete the shuffle files of earlier iterations (they filled a laptop disk).
