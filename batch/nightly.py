@@ -8,9 +8,10 @@ step on its own, and the very same commands can be run by hand:
   step        reads                              writes (under --root/<run-id>/)
   check       clean Parquet                      -   (fails if the window has no events)
   popularity  clean Parquet                      pop_global/, pop_cat/
-  train       clean Parquet                      model/ (ALS), activity/ (each user's last event)
+  train       clean Parquet                      matrix/ (the filtered interactions), model/ (ALS),
+                                                 activity/ (each user's last event)
   recommend   model/, activity/                  rec_batch/ (most recent users within the budget)
-  sim         clean Parquet (or model/)          sim_item/ (Item-kNN; --sim-source als: ALS factors)
+  sim         matrix/ (or model/)                sim_item/ (Item-kNN; --sim-source als: ALS factors)
   load        rec_batch/, sim_item/, pop_*/      Redis (batch/redis_loader.py)
   validate    Redis                              -   (fails on empty families or a full Redis)
   cleanup     --root                             keeps only the newest --keep-runs run folders
@@ -32,6 +33,7 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
+from pyspark.errors import AnalysisException
 from pyspark.ml.recommendation import ALSModel
 from pyspark.sql import DataFrame, SparkSession, functions as F
 
@@ -71,12 +73,24 @@ def path(cfg, name: str) -> str:
     return f"{cfg.root.rstrip('/')}/{cfg.run_id}/{name}"
 
 
+def interaction_matrix(spark: SparkSession, cfg) -> DataFrame:
+    """The filtered (user_id, product_id, score) matrix ALS is trained on, as saved by train.
+
+    Runs from before week 6 have no matrix/ folder: it is rebuilt from the events.
+    """
+    try:
+        return spark.read.parquet(path(cfg, "matrix"))
+    except AnalysisException:
+        return filter_rare(interaction_scores(events(spark, cfg)))
+
+
 def target(cfg) -> redis_loader.RedisTarget:
     return redis_loader.RedisTarget(cfg.redis_host, cfg.redis_port, cfg.redis_db)
 
 
 def als_params(cfg) -> als.ALSParams:
-    return als.ALSParams(rank=cfg.rank, reg_param=cfg.reg, alpha=cfg.alpha, max_iter=cfg.iter)
+    return als.ALSParams(rank=cfg.rank, reg_param=cfg.reg, alpha=cfg.alpha, max_iter=cfg.iter,
+                         checkpoint_interval=cfg.checkpoint_interval, blocks=cfg.als_blocks)
 
 
 # ---- steps ----------------------------------------------------------------
@@ -106,6 +120,7 @@ def train(spark, cfg) -> dict:
     ev = events(spark, cfg)
     matrix = filter_rare(interaction_scores(ev)).cache()
     stats = {"als_matrix": matrix_stats(matrix), "als_params": als_params(cfg).as_dict()}
+    matrix.write.mode("overwrite").parquet(path(cfg, "matrix"))     # sim and the demo reuse it
     checkpoint_dir = tempfile.mkdtemp(prefix="als-nightly-")
     spark.sparkContext.setCheckpointDir(checkpoint_dir)
     t = time.time()
@@ -138,7 +153,7 @@ def sim(spark, cfg) -> dict:
         model = ALSModel.load(path(cfg, "model"))
         table, candidates = sim_item.from_model(model, block_size=cfg.sim_block_size), model.itemFactors.count()
     else:
-        matrix = filter_rare(interaction_scores(events(spark, cfg))).cache()   # the matrix ALS is trained on
+        matrix = interaction_matrix(spark, cfg).cache()
         table, candidates = item_knn.similarities(matrix), matrix.select("product_id").distinct().count()
     table.select("product_id", "neighbour_id", "sim").write.mode("overwrite").parquet(path(cfg, "sim_item"))
     s = spark.read.parquet(path(cfg, "sim_item")).agg(F.countDistinct("product_id"), F.count("*"), F.avg("sim")).first()
@@ -207,6 +222,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--reg", type=float, default=d.reg_param)
     p.add_argument("--alpha", type=float, default=d.alpha)
     p.add_argument("--iter", type=int, default=d.max_iter)
+    p.add_argument("--checkpoint-interval", type=int, default=d.checkpoint_interval, help="ALS checkpoint every N iterations")
+    p.add_argument("--als-blocks", type=int, default=d.blocks, help="ALS user and product blocks")
     p.add_argument("--top-n", type=int, default=settings.batch_top_n, help="products per user in rec:batch")
     p.add_argument("--max-users", type=int, default=0, help="rec:batch users, 0 = as many as the budget allows")
     p.add_argument("--pop-n", type=int, default=POP_TOP_N, help="products in pop:global and each pop:cat")
