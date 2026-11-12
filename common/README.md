@@ -29,3 +29,11 @@ key = rk.rec_batch(541312140)             # "rec:batch:541312140"
 event = Event.from_json(kafka_message)    # parse a Kafka value
 top = merge_scores(batch, realtime, k=10) # [(product_id, score, source), ...]
 ```
+
+## Changes
+
+| Version | Date | Change |
+|---|---|---|
+| 1.2.0 | 2026-10-28 | `batch_top_n` 50 (was 100): `rec:batch` keeps 50 products per user so that twice as many users fit the Redis budget (1.08M instead of 566k users, 54% instead of 38% of the validation cart and purchase events covered, `docs/week-04.md`). The API returns at most 50 products |
+| 1.1.0 | 2026-10-27 | `user:recent` and `user:bought` are ZSETs scored by event time (epoch seconds), matching `streaming/main.py`; they were LIST and SET |
+| 1.0.0 | Week 2 | Contracts frozen by both pairs |
