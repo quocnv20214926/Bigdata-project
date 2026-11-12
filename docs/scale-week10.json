@@ -1,0 +1,118 @@
+{
+  "what": "Nightly batch Spark steps (check, popularity, train, recommend, sim) on the last 6, 12, 23 and 46 days before 2019-11-16",
+  "machine": "MacBook, Spark local mode, SPARK_DRIVER_MEMORY=14g, MinIO in Docker",
+  "settings": {
+    "rank": 128,
+    "iter": 5,
+    "als_blocks": 10,
+    "top_n": 50,
+    "sim_source": "item_knn"
+  },
+  "notes": "Each step is its own Python process, as in the Airflow DAG. load and validate (Redis) are not part of the scale test; in week 6 they took 96 s and 5 s.",
+  "points": [
+    {
+      "train_days": 6,
+      "source": "data/scale-runs/scale-06d",
+      "window": [
+        "2019-11-10",
+        "2019-11-16"
+      ],
+      "events": 17217420,
+      "users": 1257530,
+      "als_pairs": 8560406,
+      "als_users": 872137,
+      "als_products": 99589,
+      "train_seconds": 188.6,
+      "rec_users": 872137,
+      "rec_rows": 43606850,
+      "sim_products": 95751,
+      "sim_rows": 2900625,
+      "step_seconds": {
+        "check": 4.7,
+        "popularity": 9.1,
+        "train": 223.9,
+        "recommend": 118.4,
+        "sim": 40.2
+      },
+      "seconds": 396.3
+    },
+    {
+      "train_days": 12,
+      "source": "data/scale-runs/scale-12d",
+      "window": [
+        "2019-11-04",
+        "2019-11-16"
+      ],
+      "events": 27986684,
+      "users": 1994735,
+      "als_pairs": 14143191,
+      "als_users": 1374508,
+      "als_products": 118561,
+      "train_seconds": 293.1,
+      "rec_users": 1083864,
+      "rec_rows": 54193200,
+      "sim_products": 113740,
+      "sim_rows": 3675722,
+      "step_seconds": {
+        "check": 5.4,
+        "popularity": 10.0,
+        "train": 333.6,
+        "recommend": 217.3,
+        "sim": 73.2
+      },
+      "seconds": 639.5
+    },
+    {
+      "train_days": 23,
+      "source": "data/scale-runs/scale-23d",
+      "window": [
+        "2019-10-24",
+        "2019-11-16"
+      ],
+      "events": 42977816,
+      "users": 2832080,
+      "als_pairs": 21840588,
+      "als_users": 1938207,
+      "als_products": 134030,
+      "train_seconds": 405.4,
+      "rec_users": 1083864,
+      "rec_rows": 54193200,
+      "sim_products": 128386,
+      "sim_rows": 4399791,
+      "step_seconds": {
+        "check": 6.4,
+        "popularity": 10.7,
+        "train": 455.7,
+        "recommend": 168.1,
+        "sim": 91.1
+      },
+      "seconds": 732.0
+    },
+    {
+      "train_days": 46,
+      "source": "docs/nightly-week06-host.json (week 6 nightly run)",
+      "window": [
+        null,
+        "2019-11-16"
+      ],
+      "events": 74971956,
+      "users": 4205076,
+      "als_pairs": 38195148,
+      "als_users": 2890519,
+      "als_products": 155423,
+      "train_seconds": 697.5,
+      "rec_users": 1083864,
+      "rec_rows": 54193200,
+      "sim_products": 148414,
+      "sim_rows": 5408264,
+      "step_seconds": {
+        "check": 7.9,
+        "popularity": 12.3,
+        "train": 770.2,
+        "recommend": 218.9,
+        "sim": 168.1
+      },
+      "seconds": 1177.4
+    }
+  ]
+}
