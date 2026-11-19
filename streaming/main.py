@@ -4,7 +4,7 @@ Two streaming queries share one parsed source:
 
   events    parse -> validate -> watermark + dedup -> foreachBatch
               user:recent, user:bought   (sinks/user_state.py, week 3)
-              sim:cooc                   (sinks/cooc.py, week 4)
+              sim:cooc                   (sinks/cooc.py, week 4)\n              rec:rt                     (sinks/realtime.py, week 5)
   trending  parse -> validate -> watermark -> 1 h window sliding every 5 min,
             summed event weights per (category, product), output mode update
               trend:cat:*, trend:global  (sinks/trending.py, week 4)
@@ -39,6 +39,7 @@ from streaming.redis_conn import get_redis
 from streaming.sinks.cooc import write_partition_cooc
 from streaming.sinks.trending import current_window_end, duration_seconds, publish, write_window_totals
 from streaming.sinks.user_state import write_user_state
+from streaming.sinks.realtime import write_realtime_recommendations
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("pair2-streaming")
@@ -122,6 +123,7 @@ def _write_events_partition(rows) -> None:
     rows = list(rows)            # one partition of one micro-batch (bounded by MAX_OFFSETS_PER_TRIGGER)
     write_user_state(rows, r)
     write_partition_cooc(rows, r)
+    write_realtime_recommendations(rows, r)
 
 
 def make_events_writer(cfg: Config):

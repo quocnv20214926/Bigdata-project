@@ -95,3 +95,17 @@ Internal keys (Pair 2 only, `rt:` prefix): `rt:sess:*`, `rt:cooc:*`,
   middle of a batch can count some pairs twice.
 - The trending query has no de-duplication: Spark does not chain two stateful
   operators in update mode. Exact duplicate events add a little weight.
+
+
+## Week 5: real-time recommendation propagation
+
+After `sim:cooc:{product_id}` is refreshed, each view/cart/purchase event propagates
+`event_weight * co-occurrence_similarity` into `rec:rt:{user_id}`. The key is a
+ZSET with a six-hour TTL. `remove_from_cart` has weight zero and is ignored.
+The API merges this speed-layer score with Pair 1's `rec:batch` and filters
+purchased products.
+
+Delivery is at-least-once across the Redis-write/Spark-checkpoint boundary:
+a crash after Redis writes but before the batch guard is committed can replay
+increments. This limitation is explicitly retained rather than claiming
+end-to-end exactly-once processing.

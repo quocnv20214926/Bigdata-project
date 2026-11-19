@@ -10,6 +10,7 @@ import pytest
 
 from common import redis_keys as rk
 from streaming.sinks import cooc, trending
+from streaming.sinks.realtime import write_realtime_recommendations
 from streaming.sinks.user_state import write_user_state
 
 Ev = namedtuple("Ev", "user_id product_id event_type epoch user_session")
@@ -127,3 +128,21 @@ def test_trending_trim_keeps_top(r):
     assert r.zrange(trending.window_cat_key(1, 60), 0, -1) == ["7", "8", "9"]
     trending.publish(60, {1}, r, top_n=2)
     assert r.zrevrange(rk.trend_cat(1), 0, -1) == ["9", "8"]
+
+
+def test_realtime_recommendations_propagate_weighted_cooc_and_refresh_ttl(r):
+    r.zadd(rk.sim_cooc(10), {"20": 0.8, "30": 0.25, "10": 1.0})
+    rows = [Ev(7, 10, "view", 100, "s"), Ev(7, 10, "cart", 101, "s"),
+            Ev(7, 10, "remove_from_cart", 102, "s")]
+    assert write_realtime_recommendations(rows, r) == 4
+    scores = dict(r.zrange(rk.rec_rt(7), 0, -1, withscores=True))
+    assert scores == {"20": pytest.approx(3.2), "30": pytest.approx(1.0)}
+    assert 0 < r.ttl(rk.rec_rt(7)) <= rk.TTL["rec:rt"]
+
+
+def test_realtime_recommendations_skip_unknown_and_empty_similarity(r):
+    r.zadd(rk.sim_cooc(10), {"11": 0.7})
+    rows = [Ev(1, 10, "remove_from_cart", 1, "s"),
+            Ev(1, 12, "view", 2, "s")]
+    assert write_realtime_recommendations(rows, r) == 0
+    assert not r.exists(rk.rec_rt(1))
