@@ -6,10 +6,10 @@
 # Host ports:
 #   9092  Kafka (for clients running on the host, e.g. the replayer)
 #   8085  Kafka UI
-#   8000  Recommendation API (docs at /docs)
+#   8000  Recommendation API (docs at /docs)\n#   8501  Streamlit demo
 #   4040  Spark UI of the streaming job
 #
-# Services added in later weeks: Streamlit (week 6), Prometheus + Grafana (week 7).
+# Prometheus + Grafana monitoring remains planned for week 7.
 
 services:
   kafka:
@@ -101,8 +101,7 @@ services:
       - stream-checkpoints:/checkpoints
     restart: unless-stopped
 
-  # Recommendation API. API_MODE=mock (week 2) returns fake data;
-  # API_MODE=redis (week 5) reads real data from Redis.
+  # Recommendation API. API_MODE=mock keeps the week-2 demo; redis enables week-5 serving.
   api:
     build:
       context: ..
@@ -112,11 +111,32 @@ services:
       redis:
         condition: service_healthy
     environment:
-      API_MODE: ${API_MODE:-mock}
+      API_MODE: ${API_MODE:-redis}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:
       - "8000:8000"
+    restart: unless-stopped
+
+  # Week 6 interactive demo. Publishes simulated events to Kafka and reads
+  # recommendations from the real API.
+  ui:
+    build:
+      context: ..
+      dockerfile: ui/Dockerfile
+    container_name: recommender-ui
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+    environment:
+      API_URL: http://api:8000
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_TOPIC_EVENTS: ${KAFKA_TOPIC_EVENTS:-events}
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
 
   # Optional: run the replayer inside Docker instead of on the host.
   #   docker compose -f infra/compose.base.yml -f infra/compose.stream.yml \
