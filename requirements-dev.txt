@@ -1,0 +1,1 @@
+pytest>=8.0\nfakeredis>=2.23\nhttpx>=0.27\n
