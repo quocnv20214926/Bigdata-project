@@ -50,8 +50,23 @@ Raw data goes in `data/` (not committed to git).
 ## Documentation
 
 - [Detailed project plan](docs/plan.md)
-- Weekly reports: `docs/week-XX.md`
+- Weekly reports: `docs/week-XX.md` (Pair 1) and `docs/week-XX-pair2.md` (Pair 2)
+- [Pair 2 Week 5 — Redis-backed serving](docs/week-05-pair2.md)
+- [Pair 2 Week 6 — Streamlit demo and load test](docs/week-06-pair2.md)
 
 ## Status
 
 🚧 Week 1: project scaffolding.
+
+
+## Pair 2 demo (Weeks 5–6)
+
+Copy `.env.example` to `.env`, then start Redis, Kafka, streaming, API, and Streamlit:
+
+```bash
+docker compose --env-file .env -f infra/compose.base.yml -f infra/compose.stream.yml up -d --build
+```
+
+Open Streamlit at http://localhost:8501 and FastAPI docs at http://localhost:8000/docs.
+For details and the load-test command, see `docs/week-05-pair2.md` and
+`docs/week-06-pair2.md`.
