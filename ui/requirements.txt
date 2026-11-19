@@ -1,0 +1,1 @@
+streamlit==1.52.2\nrequests==2.32.5\nkafka-python==2.2.15\n
