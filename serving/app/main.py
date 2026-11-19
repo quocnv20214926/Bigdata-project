@@ -8,7 +8,7 @@ Endpoints (contract: common/models.py):
   GET /health
 
 API_MODE=mock  (default, week 2): fake data from MockRepository.
-API_MODE=redis (week 5): RedisRepository, not implemented yet.
+API_MODE=redis (week 5): RedisRepository backed by the shared Redis contract.
 
 Run locally from the repository root:
   uvicorn serving.app.main:app --reload --port 8000
@@ -26,7 +26,7 @@ from fastapi import FastAPI, Query, Request
 from common import CONTRACT_VERSION
 from common.config import settings
 from common.models import HealthResponse, RecommendResponse, SimilarResponse, TrendingResponse
-from serving.app.repository import MockRepository, Repository
+from serving.app.repository import MockRepository, RedisRepository, Repository
 
 API_MODE = os.getenv("API_MODE", "mock").lower()
 K_QUERY = Query(10, ge=1, le=50, description="number of items to return")
@@ -35,7 +35,11 @@ K_QUERY = Query(10, ge=1, le=50, description="number of items to return")
 def build_repository(redis_client) -> Repository:
     if API_MODE == "mock":
         return MockRepository(redis_ping=redis_client.ping if redis_client else None)
-    raise RuntimeError(f"API_MODE={API_MODE!r} is not implemented yet (RedisRepository arrives in week 5)")
+    if API_MODE == "redis":
+        if redis_client is None:
+            raise RuntimeError("API_MODE=redis requires the redis Python package")
+        return RedisRepository(redis_client)
+    raise RuntimeError(f"Unsupported API_MODE={API_MODE!r}; expected 'mock' or 'redis'")
 
 
 @asynccontextmanager

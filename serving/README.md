@@ -1,47 +1,23 @@
-# serving/: Recommendation API (Pair 2)
+# Recommendation API (Pair 2)
 
-FastAPI service implementing the API contract in `common/models.py`.
+The FastAPI service supports two modes:
 
-| Endpoint | Response model |
-|---|---|
-| `GET /recommend/{user_id}?k=10` | `RecommendResponse` |
-| `GET /similar/{product_id}?k=10` | `SimilarResponse` |
-| `GET /trending?k=10` | `TrendingResponse` (global) |
-| `GET /trending/{category_id}?k=10` | `TrendingResponse` |
-| `GET /health` | `HealthResponse` |
+- `API_MODE=mock`: deterministic demo data; Redis is optional.
+- `API_MODE=redis`: reads `rec:batch`, `rec:rt`, `user:bought`, `sim:item`, `sim:cooc`, `trend:*`, and `meta:batch:last_run` from Redis.
 
-Every response carries `X-Process-Time-Ms` (server-side latency) and `X-API-Mode`.
-
-## Modes
-
-| `API_MODE` | Status | Data source |
-|---|---|---|
-| `mock` (default) | Week 2 | `MockRepository`: deterministic fake data, Redis not required |
-| `redis` | Week 5 | `RedisRepository`: `rec:batch` + `rec:rt` merged with `common.scoring.merge_scores`, fallback to trending/popular |
-
-The mock produces every response shape the UI must handle, chosen by `user_id % 10`:
-`0` new user (trending fallback), `1` batch only, `2` real-time only, otherwise both.
-
-## Run
+Run from the repository root:
 
 ```bash
-# Local (from the repository root)
 pip install -r serving/requirements.txt
-uvicorn serving.app.main:app --reload --port 8000
-# open http://localhost:8000/docs
-
-# Tests
-python -m pytest serving/tests -q
-
-# Docker
-docker compose -f infra/compose.base.yml -f infra/compose.stream.yml up -d --build api
+API_MODE=redis REDIS_HOST=localhost uvicorn serving.app.main:app --reload --port 8000
 ```
 
-## Layout
+Endpoints: `/recommend/{user_id}`, `/similar/{product_id}`, `/trending`, `/trending/{category_id}`, `/health`.
 
-| File | Purpose |
-|---|---|
-| `app/main.py` | Routes, timing middleware, repository selection |
-| `app/repository.py` | `Repository` interface and `MockRepository` |
-| `app/mock_data.py` | Fake catalogue with REES46-like attributes |
-| `tests/` | Contract tests (responses validate against `common/models.py`) |
+Recommendation flow:
+1. Read batch and real-time ZSETs.
+2. Exclude all products in `user:bought:{user_id}`.
+3. Normalize and merge scores using `common.scoring.merge_scores` (default batch weight 0.5).
+4. If both sources are empty, fall back to `trend:global`.
+
+Product metadata is not currently stored in the Redis contract, so Redis-mode responses leave optional category/brand/price fields null except category-scoped trending.

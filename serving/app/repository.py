@@ -13,6 +13,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional, Protocol
 
+from common import redis_keys as rk
+from common.scoring import merge_scores
 from common.models import (
     HealthResponse, RecommendedItem, RecommendResponse, SimilarResponse, TrendingResponse,
 )
@@ -91,3 +93,74 @@ class MockRepository:
                 redis_ok = False
         # In mock mode the API works without Redis, so it is always "ok".
         return HealthResponse(status="ok", redis=redis_ok, batch_last_run=None)
+
+
+class RedisRepository:
+    """Production repository backed by the shared Redis key contract."""
+
+    def __init__(self, redis_client, alpha: float = 0.5):
+        self.redis = redis_client
+        self.alpha = alpha
+
+    async def _zset(self, key: str, k: int = 200) -> dict[int, float]:
+        rows = await self.redis.zrevrange(key, 0, k - 1, withscores=True)
+        return {int(member): float(score) for member, score in rows}
+
+    async def recommend(self, user_id: int, k: int) -> RecommendResponse:
+        batch_key, rt_key, bought_key = rk.rec_batch(user_id), rk.rec_rt(user_id), rk.user_bought(user_id)
+        batch_exists, rt_exists = await self.redis.exists(batch_key), await self.redis.exists(rt_key)
+        batch, realtime = await self._zset(batch_key), await self._zset(rt_key)
+        bought_rows = await self.redis.zrange(bought_key, 0, -1)
+        excluded = {int(x) for x in bought_rows}
+        merged = merge_scores(batch, realtime, alpha=self.alpha, exclude=excluded, k=k)
+        if not merged:
+            fallback = await self._zset(rk.TREND_GLOBAL, k)
+            fallback_source = "trending"
+            if not fallback:
+                fallback = await self._zset(rk.POP_GLOBAL, k)
+                fallback_source = "popular"
+            merged = [(pid, score, fallback_source) for pid, score in fallback.items()
+                      if pid not in excluded][:k]
+        items = [RecommendedItem(product_id=pid, score=round(score, 6), source=source)
+                 for pid, score, source in merged]
+        return RecommendResponse(
+            user_id=user_id, items=items, generated_at=datetime.now(timezone.utc),
+            batch_available=bool(batch_exists), realtime_available=bool(rt_exists),
+        )
+
+    async def similar(self, product_id: int, k: int) -> SimilarResponse:
+        batch = await self._zset(rk.sim_item(product_id), k)
+        realtime = await self._zset(rk.sim_cooc(product_id), k)
+        if batch and realtime:
+            merged = merge_scores(batch, realtime, alpha=self.alpha, exclude={product_id}, k=k)
+            similarity = "hybrid"
+        elif batch:
+            merged = [(pid, score, "batch") for pid, score in batch.items() if pid != product_id][:k]
+            similarity = "item"
+        else:
+            merged = [(pid, score, "realtime") for pid, score in realtime.items() if pid != product_id][:k]
+            similarity = "cooc"
+        items = [RecommendedItem(product_id=pid, score=round(score, 6), source=source)
+                 for pid, score, source in merged]
+        return SimilarResponse(product_id=product_id, items=items, similarity=similarity)
+
+    async def trending(self, category_id: Optional[int], k: int) -> TrendingResponse:
+        key = rk.trend_cat(category_id) if category_id is not None else rk.TREND_GLOBAL
+        scores = await self._zset(key, k)
+        items = [RecommendedItem(product_id=pid, score=round(score, 6), source="trending",
+                                 category_id=category_id) for pid, score in scores.items()]
+        return TrendingResponse(category_id=category_id, items=items, window_minutes=60)
+
+    async def health(self) -> HealthResponse:
+        try:
+            await self.redis.ping()
+            raw = await self.redis.get(rk.META_BATCH_LAST_RUN)
+            last_run = None
+            if raw:
+                try:
+                    last_run = datetime.fromisoformat(raw.decode() if isinstance(raw, bytes) else raw.replace("Z", "+00:00"))
+                except (TypeError, ValueError):
+                    last_run = None
+            return HealthResponse(status="ok", redis=True, batch_last_run=last_run)
+        except Exception:
+            return HealthResponse(status="degraded", redis=False, batch_last_run=None)
