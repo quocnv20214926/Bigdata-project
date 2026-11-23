@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r ui/requirements.txt
 COPY common common
 COPY ui ui
 COPY docs/*.json docs/
+COPY docs/loadtest docs/loadtest
 ENV PYTHONPATH=/app
 EXPOSE 8501
 CMD ["streamlit", "run", "ui/app.py", "--server.address=0.0.0.0", "--server.port=8501", "--browser.gatherUsageStats=false"]

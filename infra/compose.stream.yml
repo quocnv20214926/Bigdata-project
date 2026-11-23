@@ -96,6 +96,7 @@ services:
       STARTING_OFFSETS: ${STARTING_OFFSETS:-earliest}
       MAX_OFFSETS_PER_TRIGGER: ${MAX_OFFSETS_PER_TRIGGER:-50000}
       TRIGGER_SECONDS: ${TRIGGER_SECONDS:-2}
+      RT_SIMILARITY: ${RT_SIMILARITY:-cooc}       # rec:rt neighbours: cooc | item | hybrid (week 8)
     ports:
       - "4040:4040"
     volumes:

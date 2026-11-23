@@ -16,7 +16,7 @@ def line(t: str, etype: str, pid: int, uid: int, session: str, cat: int = 7) -> 
 
 
 def args(path, **kw):
-    base = dict(file=[str(path)], warmup_until="2019-10-01T01:00:00Z", end=None, batch_seconds=60,
+    base = dict(file=[str(path)], warmup_until="2019-10-01T01:00:00Z", end=None, batch_seconds=30,
                 half_life=1800.0, neighbours=20, sample=1.0, k=[1, 10], redis_host="", redis_port=0,
                 flush=True, json=None)
     base.update(kw)

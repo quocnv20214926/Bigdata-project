@@ -180,3 +180,21 @@ def test_products_keep_latest_attributes(r):
     products.write_products([Pr(1, 10, None, "apple", 999.0), Pr(1, 10, "electronics.smartphone", "apple", 949.0)], r)
     assert r.hgetall(products.product_key(1)) == {"category_id": "10", "category_code": "electronics.smartphone",
                                                   "brand": "apple", "price": "949.0"}
+
+
+def test_realtime_similarity_sources(r):
+    r.zadd(rk.sim_cooc(1), {"2": 0.8, "3": 0.4})
+    r.zadd(rk.sim_item(1), {"3": 0.6, "4": 0.9})
+    got = {}
+    for source in ("cooc", "item", "hybrid"):
+        r.delete(rk.rec_rt(7), realtime.ref_key(7))
+        realtime.update_realtime([Ev(7, 1, "view", 0, "s")], r, similarity=source)
+        got[source] = {int(p): s for p, s in r.zrange(rk.rec_rt(7), 0, -1, withscores=True)}
+    assert got["cooc"] == {2: 0.8, 3: 0.4}
+    assert got["item"] == {3: 0.6, 4: 0.9}
+    assert got["hybrid"] == pytest.approx({2: 0.4, 3: 0.5, 4: 0.45})   # in both lists ranks first
+
+
+def test_combine_neighbours_rejects_unknown_source():
+    with pytest.raises(ValueError):
+        realtime.combine_neighbours({}, {}, "als", 5)
