@@ -42,3 +42,35 @@ The main numbers the report rests on:
 
 - Scale test of the nightly batch (optional in `docs/assignment.md`).
 - Review of the report with Pair 2.
+
+## Pair 2: Real-time
+
+### 1. Weekly goals
+
+- Final report sections for the speed layer, the serving layer, the UI and Lambda vs Kappa (`docs/assignment.md`, week 9); slides.
+
+### 2. Completed work
+
+| Section of the final report | Content | Sources |
+|---|---|---|
+| 1. Speed layer | replayer and Kafka contract, the two streaming queries, checkpoint and batch-id guard, `sim:cooc`, `rec:rt` with time decay, results | `docs/week-02.md` to `docs/week-08.md` |
+| 2. Serving layer | API contract, merge and fallback, latency at 500 and 1,000 requests/s | `docs/week-05.md`, `docs/week-06.md`, `docs/loadtest/` |
+| 3. UI and monitoring | the three Streamlit pages, simulated events and the stream clock, Prometheus and Grafana | `docs/week-06.md`, `docs/week-07.md` |
+| 4. Lambda vs Kappa | comparison table and why Lambda fits this project, with the evaluation numbers of both pairs | `docs/week-07.md`, `docs/week-08.md` |
+| 5. Limits and future work | | |
+
+Written in English in [docs/report-pair2.md](report-pair2.md), to be merged with Pair 1's sections in the shared report.
+
+### 3. Results / metrics
+
+The main numbers the sections rest on: event to recommendation 2.5–2.9 s; p95 24 ms at 500 requests/s and 62 ms at 961 requests/s; next-item HR@10 0.196 for `/recommend` against 0.160 for trending in the category; products never touched: speed only 0.1351 NDCG@10 against 0.0454 for ALS (Pair 1's replay).
+
+### 4. Issues & resolutions
+
+| Issue | Resolution |
+|---|---|
+| Two replays measure the speed layer (Pair 1's in Spark, ours with the production sinks) | The report uses Pair 1's for batch + speed on the full test days and ours for the next item; both agree on the half-life and the similarity |
+
+### 5. Plan for next week
+
+- Slides, demo video, README and run guide; defense rehearsal with the whole team.

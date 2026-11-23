@@ -41,3 +41,30 @@ Laptop, Spark local mode, 14 GB driver, MinIO in Docker; ALS rank 128, 5 iterati
 
 - Answer review comments on the Pair 1 PRs.
 - Final report review with Pair 2 and the defense rehearsal (whole team).
+
+## Pair 2: Real-time
+
+### 1. Weekly goals
+
+- Demo video, README and run guide; defense rehearsal (whole team).
+
+### 2. Completed work
+
+| Task | Files |
+|---|---|
+| Run guide: setup, the whole system with one command, fresh start, filling the speed layer, a 5-minute demo script, the tests and measurements to rerun, common problems | `docs/run-guide.md` |
+| README: architecture, how to run, where everything is | `README.md` |
+
+### 3. Results / metrics
+
+To be filled after the recording: demo video link and length; rehearsal date and questions.
+
+### 4. Issues & resolutions
+
+| Issue | Resolution |
+|---|---|
+| The demo replays 2019 data while the UI sends events "now" | Simulated events follow the stream clock (`ui/helpers.py`) |
+
+### 5. Next steps
+
+- Record the demo following section 3 of `docs/run-guide.md`.
