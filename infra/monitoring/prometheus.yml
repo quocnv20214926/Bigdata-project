@@ -1,0 +1,20 @@
+# Prometheus scrape configuration of the Pair 2 stack (week 7).
+global:
+  scrape_interval: 5s          # short: micro-batches run every 2 s and the demo lasts minutes
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: api              # serving/app/metrics.py
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
+
+  - job_name: speed-layer      # streaming/monitoring/exporter.py: stream progress, Kafka offsets, Redis
+    scrape_interval: 10s
+    scrape_timeout: 8s
+    static_configs:
+      - targets: ["stream-exporter:9108"]
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

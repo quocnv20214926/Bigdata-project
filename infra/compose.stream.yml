@@ -9,8 +9,8 @@
 #   8000  Recommendation API (docs at /docs)
 #   8501  Streamlit demo
 #   4040  Spark UI of the streaming job
-#
-# Services added in later weeks: Prometheus + Grafana (week 7).
+#   9090  Prometheus
+#   3000  Grafana (admin / admin), dashboard "Recommender: real-time pipeline and API"
 
 services:
   kafka:
@@ -142,6 +142,60 @@ services:
       - "8501:8501"
     restart: unless-stopped
 
+  # ---- Monitoring (week 7) -------------------------------------------------
+  # Speed-layer exporter: stream progress (rt:meta:stream), Kafka end offsets,
+  # Redis memory and key counts, for Prometheus.
+  stream-exporter:
+    build:
+      context: ..
+      dockerfile: streaming/monitoring/Dockerfile
+    container_name: stream-exporter
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_TOPIC_EVENTS: ${KAFKA_TOPIC_EVENTS:-events}
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+      - stream-exporter
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.3.1
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/realtime.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
   # Optional: run the replayer inside Docker instead of on the host.
   #   docker compose -f infra/compose.base.yml -f infra/compose.stream.yml \
   #     --profile replay run --rm replayer --file /data/raw/2019-Oct.csv --speed 600
@@ -161,3 +215,5 @@ services:
 
 volumes:
   stream-checkpoints:
+  prometheus-data:
+  grafana-data:

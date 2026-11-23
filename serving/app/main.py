@@ -6,6 +6,7 @@ Endpoints (contract: common/models.py):
   GET /trending?k=10                (global)
   GET /trending/{category_id}?k=10
   GET /health
+  GET /metrics                      (Prometheus, week 7; not part of the contract)
 
 API_MODE=redis (week 5, default in Docker): RedisRepository, real batch and
                real-time data with fallback (serving/app/redis_repository.py).
@@ -23,12 +24,13 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from redis.exceptions import RedisError
 
 from common import CONTRACT_VERSION
 from common.config import settings
 from common.models import HealthResponse, RecommendResponse, SimilarResponse, TrendingResponse
+from serving.app import metrics
 from serving.app.redis_repository import RedisRepository
 from serving.app.repository import MockRepository, Repository
 
@@ -80,8 +82,13 @@ async def redis_unavailable(request: Request, exc: RedisError):
 async def add_timing_headers(request: Request, call_next):
     start = time.perf_counter()
     response = await call_next(request)
-    response.headers["X-Process-Time-Ms"] = f"{(time.perf_counter() - start) * 1000:.2f}"
+    elapsed = time.perf_counter() - start
+    response.headers["X-Process-Time-Ms"] = f"{elapsed * 1000:.2f}"
     response.headers["X-API-Mode"] = API_MODE
+    route = request.scope.get("route")
+    path = getattr(route, "path", "unmatched")        # template, e.g. /recommend/{user_id}
+    if path != "/metrics":
+        metrics.observe(path, request.method, response.status_code, elapsed)
     return response
 
 
@@ -91,7 +98,9 @@ def repo(request: Request) -> Repository:
 
 @app.get("/recommend/{user_id}", response_model=RecommendResponse, tags=["recommendations"])
 async def recommend(user_id: int, request: Request, k: int = K_QUERY):
-    return await repo(request).recommend(user_id, k)
+    response = await repo(request).recommend(user_id, k)
+    metrics.observe_recommendation(response)
+    return response
 
 
 @app.get("/similar/{product_id}", response_model=SimilarResponse, tags=["recommendations"])
@@ -112,3 +121,9 @@ async def trending_category(category_id: int, request: Request, k: int = K_QUERY
 @app.get("/health", response_model=HealthResponse, tags=["ops"])
 async def health(request: Request):
     return await repo(request).health()
+
+
+@app.get("/metrics", include_in_schema=False)
+async def prometheus_metrics():
+    body, content_type = metrics.render()
+    return Response(content=body, media_type=content_type)
