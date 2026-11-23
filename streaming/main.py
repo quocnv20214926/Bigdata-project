@@ -4,7 +4,9 @@ Two streaming queries share one parsed source:
 
   events    parse -> validate -> watermark + dedup -> foreachBatch
               user:recent, user:bought   (sinks/user_state.py, week 3)
+              rt:prod:* (attributes)     (sinks/products.py, week 5)
               sim:cooc                   (sinks/cooc.py, week 4)
+              rec:rt                     (sinks/realtime.py, week 5, uses the fresh sim:cooc)
   trending  parse -> validate -> watermark -> 1 h window sliding every 5 min,
             summed event weights per (category, product), output mode update
               trend:cat:*, trend:global  (sinks/trending.py, week 4)
@@ -37,6 +39,8 @@ from common.config import settings
 from streaming.parsing import parse_events, valid_events, with_watermark_and_dedup, with_weight
 from streaming.redis_conn import get_redis
 from streaming.sinks.cooc import write_partition_cooc
+from streaming.sinks.products import write_products
+from streaming.sinks.realtime import update_realtime
 from streaming.sinks.trending import current_window_end, duration_seconds, publish, write_window_totals
 from streaming.sinks.user_state import write_user_state
 
@@ -91,7 +95,7 @@ def read_source(spark: SparkSession, cfg: Config) -> DataFrame:
     )
 
 
-# ---- Batch-id guard (the cooc counters are not idempotent) --------------
+# ---- Batch-id guard (cooc counters and rec:rt are not idempotent) -------
 
 def read_query_id(checkpoint: str) -> str:
     """Spark writes {checkpoint}/metadata = {"id": ...} before the first batch.
@@ -121,7 +125,9 @@ def _write_events_partition(rows) -> None:
     r = get_redis()
     rows = list(rows)            # one partition of one micro-batch (bounded by MAX_OFFSETS_PER_TRIGGER)
     write_user_state(rows, r)
+    write_products(rows, r)
     write_partition_cooc(rows, r)
+    update_realtime(rows, r)     # after cooc: uses the similarities updated by this batch
 
 
 def make_events_writer(cfg: Config):
@@ -138,7 +144,8 @@ def make_events_writer(cfg: Config):
             return
 
         started = time.time()
-        df = df.select("user_id", "product_id", "event_type", "epoch", "user_session", "event_time").persist()
+        df = df.select("user_id", "product_id", "event_type", "epoch", "user_session", "event_time",
+                       "category_id", "category_code", "brand", "price").persist()
         try:
             rows = df.count()
             max_time = None
