@@ -4,10 +4,12 @@ Compares recommendation models on the time-based split. Code follows the contrac
 
 | File | Purpose |
 |---|---|
-| `metrics.py` | Precision, Recall, Hit Rate, NDCG at k (plain Python for one user, Spark for many) and catalog coverage |
+| `metrics.py` | Precision, Recall, Hit Rate, NDCG at k (plain Python for one user, Spark for many, per user or averaged) and catalog coverage |
 | `offline.py` | Runner: interaction matrix, Popularity and Item-kNN baselines, implicit ALS, metrics, JSON report |
 | `tune_als.py` | ALS parameter search (rank, regParam, alpha) on a validation week cut from the end of train, then the best parameters on test |
 | `similarity.py` | `sim:item` (ALS item factors) vs Item-kNN: size, overlap, same category, next-item hit rate, item-based metrics |
+| `bootstrap.py` | 95% percentile bootstrap intervals over users, and paired intervals for the difference of two models |
+| `final_eval.py` | Final evaluation (week 7): the three models with bootstrap intervals, by user segment, with and without already-seen products |
 | `tests/` | Metric checks against hand-computed values, and an end-to-end run on tiny data |
 
 ## Protocol
@@ -21,8 +23,8 @@ Compares recommendation models on the time-based split. Code follows the contrac
 | Evaluated users | users with ground truth who are in the filtered ALS matrix (warm users); a deterministic sample of `--eval-users` (default 100,000); both models score the same users |
 | Relevance | binary: a recommended product is relevant if it is in the ground truth |
 | Metrics | Precision@10/20, Recall@10/20, Hit Rate@10/20, NDCG@10/20, catalog coverage@10 |
-| Already-seen products | kept in both the recommendations and the ground truth (repeat views are common in REES46); to revisit in week 7 |
-| Cold users | not part of this comparison: they are served by popularity in every setup; segment analysis (new / light / heavy) is week 7 |
+| Already-seen products | kept in both the recommendations and the ground truth (repeat views are common in REES46); week 7 also scores them removed (below) |
+| Cold users | not part of this comparison: they are served by popularity in every setup; week 7 scores them by segment (below) |
 
 Metric definitions for one user with recommendations r_1..r_k and ground truth T:
 `precision@k = hits/k`, `recall@k = hits/|T|`, `hit_rate@k = 1 if hits > 0`,
@@ -69,4 +71,22 @@ SPARK_DRIVER_MEMORY=14g python -m evaluation.tune_als --report docs/eval-week04-
   --final-report docs/eval-week04-als.json --model-out s3a://lake/models/als/week4/
 SPARK_DRIVER_MEMORY=14g python -m evaluation.similarity --model s3a://lake/models/als/week4/ \
   --sim-out s3a://lake/models/sim_item/week4/ --report docs/eval-week04-sim.json
+```
+
+## Final evaluation (week 7)
+
+Same split, ground truth and metrics as above, with three additions.
+
+| Item | Choice |
+|---|---|
+| Intervals | each metric is first computed per user (`metrics.per_user_metrics`); the mean over users gets a 95% percentile bootstrap interval (1,000 resamples of the users, seed 42). Two models are compared on the per-user differences, resampled the same way (paired bootstrap): the difference is clear when its interval excludes 0 |
+| Segments | by distinct training products with a positive weight: new (0), light (1 to 5), heavy (more than 5). 30,000 test users of each segment (`--segment-users`), drawn with the seed |
+| Warm group | the week 3 sample (100,000 test users in the ALS matrix, `--eval-users`), so its numbers compare with weeks 3 to 6 |
+| Fallback | a model without a list for a user, or with a short one, is completed with the Popularity list, as the API does when `rec:batch` is missing. Item-kNN reads the unfiltered history, so users outside the ALS matrix can still get its list |
+| Unseen variant | products the user interacted with in train are removed from the lists (refilled from the model's top 120, then Popularity) and from the ground truth; users left without ground truth drop out |
+| Report | per group (warm, new, light, heavy) and variant: users, the share of users with an own ALS / Item-kNN list, every metric as mean [low, high] for each model, and the differences ALS - Popularity, ALS - Item-kNN, Item-kNN - Popularity |
+
+```bash
+SPARK_DRIVER_MEMORY=14g python -m evaluation.final_eval --report docs/eval-week07.json
+python -m evaluation.final_eval --input data/clean/events --no-s3 --eval-users 20000 --segment-users 5000
 ```

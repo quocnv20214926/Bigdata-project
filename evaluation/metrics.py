@@ -50,8 +50,9 @@ def ndcg_at_k(recommended: Sequence[int], relevant: Collection[int], k: int) -> 
     return dcg / idcg if idcg else 0.0
 
 
-def ranking_metrics(recs: DataFrame, truth: DataFrame, ks: Iterable[int] = (10, 20)) -> dict:
-    """Mean precision, recall, hit rate and NDCG at each k, over the users in `truth`.
+def per_user_metrics(recs: DataFrame, truth: DataFrame, ks: Iterable[int] = (10, 20)) -> DataFrame:
+    """One row per user in `truth`: user_id, n_rel, then precision@k, recall@k, hit_rate@k and
+    ndcg@k for each k (doubles). A user without recommendations scores 0.
 
     recs:  (user_id, product_id, rank), rank 1 = best, one row per (user, product).
     truth: (user_id, product_id), the relevant products of each evaluated user.
@@ -71,15 +72,28 @@ def ranking_metrics(recs: DataFrame, truth: DataFrame, ks: Iterable[int] = (10, 
                  F.sum(F.when(in_k, F.col("gain")).otherwise(0.0)).alias(f"dcg{k}")]
     per_user = n_relevant.join(hits.groupBy("user_id").agg(*sums), "user_id", "left").fillna(0)
 
-    means = [F.count("*").alias("users")]
+    cols = [F.col("user_id"), F.col("n_rel")]
     for k in ks:
         idcg = F.element_at(F.array(*[F.lit(ideal_dcg(n, k)) for n in range(1, k + 1)]),
                             F.least(F.col("n_rel"), F.lit(k)).cast("int"))
-        means += [F.avg(F.col(f"hits{k}") / k).alias(f"precision@{k}"),
-                  F.avg(F.col(f"hits{k}") / F.col("n_rel")).alias(f"recall@{k}"),
-                  F.avg((F.col(f"hits{k}") > 0).cast("double")).alias(f"hit_rate@{k}"),
-                  F.avg(F.col(f"dcg{k}") / idcg).alias(f"ndcg@{k}")]
-    row = per_user.agg(*means).first().asDict()
+        cols += [(F.col(f"hits{k}") / k).alias(f"precision@{k}"),
+                 (F.col(f"hits{k}") / F.col("n_rel")).alias(f"recall@{k}"),
+                 (F.col(f"hits{k}") > 0).cast("double").alias(f"hit_rate@{k}"),
+                 (F.col(f"dcg{k}") / idcg).alias(f"ndcg@{k}")]
+    return per_user.select(*cols)
+
+
+def ranking_metrics(recs: DataFrame, truth: DataFrame, ks: Iterable[int] = (10, 20)) -> dict:
+    """Mean precision, recall, hit rate and NDCG at each k, over the users in `truth`.
+
+    recs:  (user_id, product_id, rank), rank 1 = best, one row per (user, product).
+    truth: (user_id, product_id), the relevant products of each evaluated user.
+    """
+    ks = sorted(set(ks))
+    names = [f"{m}@{k}" for k in ks for m in ("precision", "recall", "hit_rate", "ndcg")]
+    row = (per_user_metrics(recs, truth, ks)
+           .agg(F.count("*").alias("users"), *[F.avg(F.col(n)).alias(n) for n in names])
+           .first().asDict())
     return {name: (round(v, 6) if isinstance(v, float) else v) for name, v in row.items()}
 
 
