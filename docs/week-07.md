@@ -133,7 +133,13 @@ Tests: 54 / 54 pass (`streaming`, `serving`, `ingestion`, `ui`).
 
 **Half-life of `rec:rt`** (same replay, `docs/eval-pair2-week07-halflife-*.json`):
 
-HALF_LIFE_TABLE
+| Half-life | `rec_rt` HR@10 | `rec_rt` NDCG@10 | `rec_rt` HR@20 | `api` HR@10 | `api` HR@20 |
+|---:|---:|---:|---:|---:|---:|
+| **5 min** | 0.1901 | 0.1021 | 0.2625 | 0.1964 | 0.2769 |
+| 15 min | 0.1839 | 0.0984 | 0.2557 | 0.1904 | 0.2703 |
+| 30 min | 0.1814 | 0.0970 | 0.2533 | 0.1880 | 0.2677 |
+
+Shorter is better on every measure: the next product follows the last few views, not the last half hour. 5 minutes is also what Pair 1's replay chose on products the user has never touched (`docs/week-08.md`). A 2-hour run was stopped for time; the trend is monotonic over 5–30 min.
 
 **Monitoring.** The API and exporter metrics were checked on the local run (the dashboard's 25 PromQL expressions parse, every metric they use is exposed; `kafka_topic_end_offset` needs Kafka, so it is only seen in Docker). The dashboard itself has to be checked in Docker (section 4 of `docs/run-guide.md`).
 
