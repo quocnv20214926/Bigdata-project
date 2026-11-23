@@ -1,0 +1,89 @@
+{
+  "what": "Week 11 optimisation: can the nightly train step run in less Spark driver memory? Full history (as_of 2019-11-16), ALS rank 128, 5 iterations",
+  "machine": "MacBook M1 Max, 10 cores, 32 GB RAM; Docker Desktop VM 8 CPUs, 7.75 GiB; MinIO and Redis in Docker; SPARK_MASTER_URL=local[8]",
+  "code": "master 18d55dc, no code change; separate root s3a://lake/opt/ (deleted afterwards), stats in data/opt-runs/",
+  "runs": [
+    {
+      "run_id": "integ-20261123b",
+      "driver_memory": "10g",
+      "als_blocks": 10,
+      "master": "local[*]",
+      "result": "train failed: java.lang.OutOfMemoryError: Java heap space in the ALS shuffle (CoGroupedRDD / ExternalAppendOnlyMap) after about 90 s"
+    },
+    {
+      "run_id": "integ-20261123c",
+      "driver_memory": "14g",
+      "als_blocks": 10,
+      "master": "local[8]",
+      "result": "ok",
+      "train_seconds_step": 1102.0,
+      "als_seconds": 1027.1,
+      "train_peak_java_rss_gb": 12.29,
+      "recommend_seconds": 237.7,
+      "recommend_peak_java_rss_gb": 4.07,
+      "min_macos_free_pct": 43,
+      "peak_swap_gb": 5.04
+    },
+    {
+      "run_id": "opt-20261123-b20",
+      "driver_memory": "10g",
+      "als_blocks": 20,
+      "master": "local[8]",
+      "result": "train ok; recommend failed after 24 s: java.net.SocketException: No buffer space available (PythonRunner writer thread, macOS socket buffers); the model was deleted by the script's cleanup before a retry",
+      "train_seconds_step": 862.3,
+      "als_seconds": 790.3,
+      "train_peak_java_rss_gb": 10.38,
+      "min_macos_free_pct": 56,
+      "peak_swap_gb": 2.37
+    },
+    {
+      "run_id": "opt-20261123-b20r",
+      "driver_memory": "10g",
+      "als_blocks": 20,
+      "master": "local[8]",
+      "result": "ok (recommend succeeded on the first try)",
+      "train_seconds_step": 852.0,
+      "als_seconds": 782.8,
+      "train_peak_java_rss_gb": 9.43,
+      "recommend_seconds": 234.9,
+      "recommend_users": 1083864,
+      "recommend_rows": 54193200,
+      "recommend_peak_java_rss_gb": 4.3,
+      "min_macos_free_pct": 58,
+      "peak_swap_gb": 2.21
+    }
+  ],
+  "als_matrix": {
+    "pairs": 38195148,
+    "users": 2890519,
+    "products": 155423,
+    "density": 8.502e-05
+  },
+  "same_output_as_integ": true,
+  "docker_crashes": 0,
+  "not_measured": "I2 (--als-blocks 40) was not needed: blocks 20 fits in 10g. Python worker memory was not captured (the sampler's process match found none).",
+  "quality_check": {
+    "what": "evaluation.offline, same protocol as docs/eval-week06-als-iter5.json (100,000 test users, rank 128, 5 iterations), only --als-blocks 20; SPARK_DRIVER_MEMORY=10g, SPARK_MASTER_URL=local[8]",
+    "report": "docs/eval-als-blocks20.json",
+    "als_blocks20": {
+      "ndcg@10": 0.122524,
+      "recall@10": 0.116163,
+      "hit_rate@10": 0.35578,
+      "coverage@10": 0.013273
+    },
+    "als_blocks10_week6": {
+      "ndcg@10": 0.122572,
+      "recall@10": 0.116225,
+      "hit_rate@10": 0.3561,
+      "coverage@10": 0.013177
+    },
+    "ndcg10_difference": -4.8e-05,
+    "accepted": true,
+    "als_train_seconds": {
+      "blocks20_10g_local8": 749.5,
+      "blocks10_14g_local_all_week6": 675.8
+    },
+    "popularity_unchanged": true
+  },
+  "decision": "batch/nightly.py: NIGHTLY_ALS_BLOCKS = 20 is the default of --als-blocks; the evaluation scripts keep ALSParams.blocks (10)"
+}

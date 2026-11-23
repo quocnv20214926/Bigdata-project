@@ -121,9 +121,18 @@ day Pair 2 replays), so the same commands run by hand on the host and as Airflow
 ```bash
 run=$(date -u +%Y%m%dT%H%M%S)      # same form as the Airflow run ids, so cleanup keeps the newest
 for step in check popularity train recommend sim load validate cleanup; do
-  SPARK_DRIVER_MEMORY=14g python -m batch.nightly $step --run-id $run || break
+  SPARK_DRIVER_MEMORY=10g SPARK_MASTER_URL='local[8]' python -m batch.nightly $step --run-id $run || break
 done
 ```
+
+On a laptop (measured on a 32 GB, 10-core Mac with Docker Desktop at 8 GB for MinIO and Redis,
+`docs/nightly-memory-laptop.json`):
+
+- `train` uses 20 ALS blocks by default (`NIGHTLY_ALS_BLOCKS`). With the old 10 blocks the full
+  history needs 14g and still runs out of heap at 10g; with 20 blocks 10g is enough (Java peak 9.4 GB)
+  and `train` is faster (852 s against 1102 s).
+- `local[8]` leaves two cores to Docker. With `local[*]` the Docker Desktop VM stopped once during
+  `train` (MinIO and Redis went down with it).
 
 What lands in Redis (keys from `common/redis_keys.py`, scores rounded to 4 decimals):
 
@@ -166,10 +175,11 @@ broadcast once, each Spark task multiplies blocks of 128 users by them and keeps
 give the same lists). `train` now also saves the filtered interaction matrix (`matrix/`), so `sim`
 reuses it instead of rebuilding it from the events. ALS now runs 5 iterations instead of 10: on the
 laptop the full nightly run dropped from 44 to 21 minutes with NDCG@10 slightly higher
-(`docs/week-06.md`). Knobs for timing experiments (more blocks and Kryo were slower in local mode):
+(`docs/week-06.md`). Knobs for timing experiments (on 21 days of data more blocks and Kryo were
+slower in local mode; on the full history 20 blocks won, see the nightly section above):
 
 ```bash
-python -m batch.nightly train --run-id $run --iter 10 --als-blocks 20 --checkpoint-interval 4
+python -m batch.nightly train --run-id $run --iter 10 --als-blocks 40 --checkpoint-interval 4
 SPARK_EXTRA_CONF="spark.serializer=org.apache.spark.serializer.KryoSerializer" python -m batch.nightly train --run-id $run
 ```
 

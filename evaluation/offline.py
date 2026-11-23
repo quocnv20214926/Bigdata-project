@@ -178,6 +178,7 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=defaults.seed)
     p.add_argument("--checkpoint-interval", type=int, default=defaults.checkpoint_interval,
                    help="ALS: save factors every N iterations so old shuffle files can be deleted")
+    p.add_argument("--als-blocks", type=int, default=defaults.blocks, help="ALS user and product blocks")
     p.add_argument("--model-out", help="also save the ALS model here (used by sim:item)")
     p.add_argument("--knn-neighbours", type=int, default=knn_defaults.neighbours)
     p.add_argument("--knn-max-items", type=int, default=knn_defaults.max_items_per_user,
@@ -193,7 +194,8 @@ def main() -> None:
     spark.sparkContext.setCheckpointDir(checkpoint_dir)
     train, test = load_split(spark, args.input)
     params = als.ALSParams(rank=args.rank, reg_param=args.reg, alpha=args.alpha,
-                           max_iter=args.iter, seed=args.seed, checkpoint_interval=args.checkpoint_interval)
+                           max_iter=args.iter, seed=args.seed, checkpoint_interval=args.checkpoint_interval,
+                           blocks=args.als_blocks)
     knn_params = item_knn.KNNParams(neighbours=args.knn_neighbours, max_items_per_user=args.knn_max_items,
                                     min_common_users=args.knn_min_common)
     result = run(train, test, params, args.eval_users, tuple(args.truth_events), model_out=args.model_out,

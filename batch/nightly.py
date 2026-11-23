@@ -207,6 +207,13 @@ def run_step(spark: SparkSession, step: str, cfg) -> dict:
     return stats
 
 
+# ALS blocks for the nightly run. On the full history (46 days, rank 128, 5 iterations) 20 blocks
+# train in 10g of driver memory where 10 blocks run out of heap, and train faster (852 s with 10g,
+# against 1102 s for 10 blocks with 14g; docs/nightly-memory-laptop.json). The evaluation scripts keep
+# ALSParams.blocks (10) so the week 3 to 8 results stay reproducible.
+NIGHTLY_ALS_BLOCKS = 20
+
+
 def parser() -> argparse.ArgumentParser:
     d = als.ALSParams()
     p = argparse.ArgumentParser(description="Nightly batch: train ALS, sim:item, popularity, load Redis")
@@ -223,7 +230,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--alpha", type=float, default=d.alpha)
     p.add_argument("--iter", type=int, default=d.max_iter)
     p.add_argument("--checkpoint-interval", type=int, default=d.checkpoint_interval, help="ALS checkpoint every N iterations")
-    p.add_argument("--als-blocks", type=int, default=d.blocks, help="ALS user and product blocks")
+    p.add_argument("--als-blocks", type=int, default=NIGHTLY_ALS_BLOCKS, help="ALS user and product blocks")
     p.add_argument("--top-n", type=int, default=settings.batch_top_n, help="products per user in rec:batch")
     p.add_argument("--max-users", type=int, default=0, help="rec:batch users, 0 = as many as the budget allows")
     p.add_argument("--pop-n", type=int, default=POP_TOP_N, help="products in pop:global and each pop:cat")
