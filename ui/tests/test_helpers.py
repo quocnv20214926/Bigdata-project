@@ -73,4 +73,18 @@ def test_wait_for_event_sees_the_processed_event(r):
     assert h.wait_for_event(9, event, timeout=0.6) is None
     epoch = int(event.event_time.timestamp())
     r.zadd(rk.user_recent(9), {rk.encode_recent(100, "view", epoch): epoch})
+    assert h.wait_for_event(9, event, timeout=2) is not None      # no rec:rt for this user: done
+
+
+def test_wait_for_event_waits_for_rec_rt(r):
+    """user:recent is written before rec:rt in the same micro-batch: wait for both."""
+    event = Event(event_time=datetime(2019, 10, 1, 7, 59, 23, tzinfo=timezone.utc), event_type="view",
+                  product_id=100, category_id=7, category_code=None, brand=None, price=1.0,
+                  user_id=9, user_session="demo-9")
+    epoch = int(event.event_time.timestamp())
+    r.zadd(rk.rec_rt(9), {"5": 1.0})
+    r.set("rt:rect:9", epoch - 3600)                                  # rec:rt still from an older event
+    r.zadd(rk.user_recent(9), {rk.encode_recent(100, "view", epoch): epoch})
+    assert h.wait_for_event(9, event, timeout=0.6) is None
+    r.set("rt:rect:9", epoch)                                         # rec:rt rewritten for the event
     assert h.wait_for_event(9, event, timeout=2) is not None

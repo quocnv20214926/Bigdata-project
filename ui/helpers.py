@@ -165,17 +165,27 @@ def send_event(user_id: int, product_id: int, event_type: str) -> Event:
 
 
 def wait_for_event(user_id: int, event: Event, timeout: float = 30.0) -> Optional[float]:
-    """Seconds until the streaming job wrote the event into user:recent, or None."""
-    member = rk.encode_recent(event.product_id, event.event_type, int(event.event_time.timestamp()))
+    """Seconds until the speed layer has fully applied the event, or None.
+
+    In one micro-batch the job writes user:recent first, then sim:cooc and rec:rt
+    (streaming/main.py). Seeing the event in user:recent is therefore not enough:
+    we also wait until rec:rt has been rewritten for it, i.e. its reference time
+    rt:rect:{user} (written in the same transaction as rec:rt) reaches the event
+    time. If the user has no rec:rt (no neighbours at all), user:recent suffices.
+    """
+    epoch = int(event.event_time.timestamp())
+    member = rk.encode_recent(event.product_id, event.event_type, epoch)
     r = get_redis()
     started = time.time()
     while time.time() - started < timeout:
         try:
             if r.zscore(rk.user_recent(user_id), member) is not None:
-                return time.time() - started
+                ref = r.get(f"rt:rect:{user_id}")
+                if (ref is not None and int(ref) >= epoch) or not r.exists(rk.rec_rt(user_id)):
+                    return time.time() - started
         except redis.RedisError:
             pass
-        time.sleep(0.5)
+        time.sleep(0.25)
     return None
 
 
