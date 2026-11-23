@@ -7,9 +7,10 @@
 #   9092  Kafka (for clients running on the host, e.g. the replayer)
 #   8085  Kafka UI
 #   8000  Recommendation API (docs at /docs)
+#   8501  Streamlit demo
 #   4040  Spark UI of the streaming job
 #
-# Services added in later weeks: Streamlit (week 6), Prometheus + Grafana (week 7).
+# Services added in later weeks: Prometheus + Grafana (week 7).
 
 services:
   kafka:
@@ -117,6 +118,29 @@ services:
       REDIS_PORT: 6379
     ports:
       - "8000:8000"
+    restart: unless-stopped
+
+  # Streamlit demo (week 6). Reads the API, reads Pair 2 keys in Redis (recent
+  # activity, stream clock), publishes simulated events to Kafka.
+  ui:
+    build:
+      context: ..
+      dockerfile: ui/Dockerfile
+    container_name: ui
+    depends_on:
+      api:
+        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      API_URL: http://api:8000
+      KAFKA_BOOTSTRAP: kafka:29092
+      KAFKA_TOPIC_EVENTS: ${KAFKA_TOPIC_EVENTS:-events}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
 
   # Optional: run the replayer inside Docker instead of on the host.
   #   docker compose -f infra/compose.base.yml -f infra/compose.stream.yml \

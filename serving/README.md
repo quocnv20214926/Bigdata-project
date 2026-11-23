@@ -86,3 +86,4 @@ docker compose -f infra/compose.base.yml -f infra/compose.stream.yml up -d --bui
 | `app/mock_data.py` | Fake catalogue with REES46-like attributes |
 | `tests/test_redis_api.py` | `RedisRepository` on fakeredis: merge, bought filter, fallback chain, contract 1.0 types, similar, trending, health, HTTP 503 |
 | `tests/test_mock_api.py` | Contract tests of the mock |
+| `loadtest/` | Locust load test, report summariser, standard-library quick check ([README](loadtest/README.md)) |

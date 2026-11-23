@@ -95,3 +95,69 @@ Three test-period buyers that have `rec:batch`, picked at random (seed 42), and 
 - Final offline evaluation of ALS against Popularity and Item-kNN with bootstrap confidence intervals.
 - Results by user segment: new, light (1 to 5 interactions) and heavy users.
 - Revisit keeping already-seen products in the lists and in the ground truth (week 3 choice): the demo shows ALS lists made mostly of products the user has seen.
+
+## Pair 2: Real-time
+
+### 1. Weekly goals
+
+- **C:** Streamlit pages 1–2: recommendation demo (recent activity, recommendations with their source, "simulate viewing product X" through Kafka) and trending / similar products.
+- **D:** load test with Locust: p50 / p95 / p99 of the API at 500–1,000 requests per second.
+- Deliverable: Streamlit demo; latency report.
+
+### 2. Completed work
+
+| Task | Files | Owner |
+|---|---|---|
+| Streamlit app with page navigation (pages 1–2; page 3 is reserved for week 8) | `ui/app.py` | C |
+| Page 1: stream status (stream clock, events processed, last micro-batch), the user's `user:recent` with product attributes, `/recommend` with source, `batch_available` / `realtime_available` and API latency; a picker of users that have `rec:rt` | `ui/views/recommend.py` | C |
+| Simulated event: view / cart / purchase of a recommended or recently seen product (or any id), sent with the replayer's contract (`Event.to_json()`, key = `user_id`). Stamped one second after the stream clock, with the product's attributes from `rt:prod`; the page waits until the event is in `user:recent`, then shows the new list with new products marked | `ui/helpers.py` | C |
+| Page 2: trending (global or by category, bar chart, `pop:*` fallback shown as `popular`) and similar products (`cooc` / `item` / `hybrid`, share in the same category) | `ui/views/explore.py` | C |
+| UI image (`common/` included) and `ui` service on port 8501 | `ui/Dockerfile`, `infra/compose.stream.yml` | C |
+| Locust load test: real ids from Redis, traffic mix 70 % recommend / 15 % similar / 15 % trending, 10 % unknown users (fallback path); closed-loop or fixed-rate mode (`LOADTEST_CLIENT_RPS`) | `serving/loadtest/locustfile.py` | D |
+| Locust CSV → report table and JSON | `serving/loadtest/summarize.py`, `docs/loadtest/*.json` | D |
+| Tests: 4 UI helper tests (recent activity, event time from the stream clock, Kafka payload, wait for processing) | `ui/tests/test_helpers.py` | C |
+
+Merged from Dương's branch `duong/week5-week6`: the first single-page Streamlit app (its layout became pages 1–2, the producer moved from `kafka-python` to `confluent-kafka` like the replayer), the `ui` service, and the standard-library load script, kept as `serving/loadtest/quick_check.py`. Its `rec:rt` sink and `RedisRepository` were not merged: the week 5 versions already cover them with the time decay of the plan.
+
+### 3. Results / metrics
+
+Tests: 45 / 45 pass (`streaming`, `serving`, `ingestion`, `ui`).
+
+**Setup.** Redis filled by the streaming job from the October sample (200,000 events, 277,399 keys, 131 MB). API in `redis` mode, `uvicorn[standard]` with 2 workers as in the Docker image. API, Redis and Locust on the same 2-core, 7 GB machine, so Locust takes part of the CPU the API would have. No `rec:batch` in this stack (real-time and fallback paths only).
+
+**Latency at a fixed rate** (60 s per run, `docs/loadtest/rate500.json`, `rate1000.json`):
+
+| Target | Achieved | Requests | Failures | p50 | p95 | p99 | max |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 500 requests/s | 497 /s | 29,366 | 0 | 12 ms | 24 ms | 31 ms | 80 ms |
+| 1,000 requests/s | 961 /s | 56,791 | 0 | 24 ms | 62 ms | 82 ms | 134 ms |
+
+`/recommend` alone at 1,000 requests/s: p50 26 ms, p95 65 ms, p99 84 ms. The target of the plan, **p95 < 100 ms at 500–1,000 requests/s, is met**.
+
+**Maximum throughput** (closed loop, each client sends its next request as soon as the previous one returns, 30 s per run, `docs/loadtest/u*.json`):
+
+| Clients | Requests/s | p50 | p95 | p99 |
+|---:|---:|---:|---:|---:|
+| 10 | 1,027 | 9 ms | 16 ms | 21 ms |
+| 25 | 1,031 | 22 ms | 38 ms | 50 ms |
+| 50 | 1,072 | 44 ms | 70 ms | 85 ms |
+| 100 | 1,096 | 85 ms | 140 ms | 160 ms |
+
+Throughput saturates at about 1,050 requests/s on this machine: beyond that, more clients only queue. A request costs the API about 2 ms (`X-Process-Time-Ms`), so the limit is CPU shared by the two workers, Redis and Locust.
+
+**Event to recommendation.** Time from an event entering the stream to its being in `user:recent` and `rec:rt`, with the job running continuously (trigger 2 s, file source on the same machine instead of Kafka): 2.5–2.9 s for four events, 6.8 s for the first one (warm-up). Four of the five events changed between 1 and 10 of the user's top 10 real-time products. With Kafka the same trigger applies; the UI shows the measured time after each simulated event.
+
+### 4. Issues & resolutions
+
+| Issue | Resolution |
+|---|---|
+| A simulated event stamped with the current date would move the watermark from 2019 to 2026 (all later replayed events dropped as late) and decay the user's `rec:rt` to zero | Events are stamped one second after the stream clock (`events_max_event_time` in `rt:meta:stream`), or after the user's newest event if later |
+| The API does not expose a user's recent activity | The UI reads `user:recent` (and `rt:prod`, `rt:meta:stream`) from Redis directly, read-only; all recommendations still come from the API |
+| First Locust runs: about 45 ms per request even at 200 requests/s, against 3 ms with curl | Plain `uvicorn` with `--workers 2` and kept-alive connections waited ~40 ms per response (Nagle's algorithm with delayed acknowledgements). Measured again with `uvicorn[standard]` (uvloop, httptools), as in the Docker image: 2 ms |
+| Closed-loop Locust runs show the saturation point, not latency at a given rate | Fixed-rate mode (`LOADTEST_CLIENT_RPS`) for the latency table; closed loop only for the maximum throughput |
+| The load test was in `evaluation/`, which is a Pair 1 folder | Moved to `serving/loadtest/` |
+
+### 5. Plan for next week
+
+- **C:** monitoring: Prometheus metrics of the API, Grafana dashboard (API, streaming progress, Redis), Kafka UI already in place.
+- **D:** speed-only evaluation: replay the test period and measure the next-item Hit Rate@K of `rec:rt` against a popularity baseline.

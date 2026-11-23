@@ -104,7 +104,7 @@ This run still used the earlier defaults (ALS rank 64, alpha 10, `sim:item` from
 
 ### 3. Results / metrics
 
-Tests: 41 / 41 pass (`streaming`, `serving`, `ingestion`) on PySpark 3.5.3 and 4.1.3.
+Tests: 41 / 41 pass (`streaming`, `serving`, `ingestion`) on PySpark 3.5.3.
 
 **Run on real data.** October sample (200,000 events, 2019-10-01 00:00–06:06 UTC), 4 micro-batches of 50,000 events, local Spark on 2 cores, then the API in `redis` mode on the same Redis. There is no `rec:batch` yet (Pair 1 loads it into its own stack), so `/recommend` shows the real-time path and the fallback.
 

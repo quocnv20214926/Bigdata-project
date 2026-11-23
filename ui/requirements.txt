@@ -1,0 +1,5 @@
+streamlit==1.67.0
+requests==2.34.2
+redis==8.1.0
+confluent-kafka==2.16.2
+pandas==3.0.5

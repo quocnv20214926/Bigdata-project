@@ -1,0 +1,55 @@
+{
+  "label": "rate1000",
+  "rows": [
+    {
+      "endpoint": "/recommend/{user_id}",
+      "requests": 39661,
+      "failures": 0,
+      "rps": 671.3,
+      "p50_ms": 26.0,
+      "p95_ms": 65.0,
+      "p99_ms": 84.0,
+      "max_ms": 133.8
+    },
+    {
+      "endpoint": "/similar/{product_id}",
+      "requests": 8443,
+      "failures": 0,
+      "rps": 142.9,
+      "p50_ms": 24.0,
+      "p95_ms": 59.0,
+      "p99_ms": 75.0,
+      "max_ms": 127.8
+    },
+    {
+      "endpoint": "/trending",
+      "requests": 2897,
+      "failures": 0,
+      "rps": 49.0,
+      "p50_ms": 20.0,
+      "p95_ms": 48.0,
+      "p99_ms": 61.0,
+      "max_ms": 106.5
+    },
+    {
+      "endpoint": "/trending/{category_id}",
+      "requests": 5790,
+      "failures": 0,
+      "rps": 98.0,
+      "p50_ms": 20.0,
+      "p95_ms": 48.0,
+      "p99_ms": 63.0,
+      "max_ms": 106.6
+    },
+    {
+      "endpoint": "total",
+      "requests": 56791,
+      "failures": 0,
+      "rps": 961.3,
+      "p50_ms": 24.0,
+      "p95_ms": 62.0,
+      "p99_ms": 82.0,
+      "max_ms": 133.8
+    }
+  ]
+}
