@@ -101,8 +101,8 @@ services:
       - stream-checkpoints:/checkpoints
     restart: unless-stopped
 
-  # Recommendation API. API_MODE=mock (week 2) returns fake data;
-  # API_MODE=redis (week 5) reads real data from Redis.
+  # Recommendation API. API_MODE=redis (default, week 5) reads real data
+  # from Redis; API_MODE=mock (week 2) returns fake data.
   api:
     build:
       context: ..
@@ -112,7 +112,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      API_MODE: ${API_MODE:-mock}
+      API_MODE: ${API_MODE:-redis}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:

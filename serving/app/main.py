@@ -7,8 +7,9 @@ Endpoints (contract: common/models.py):
   GET /trending/{category_id}?k=10
   GET /health
 
-API_MODE=mock  (default, week 2): fake data from MockRepository.
-API_MODE=redis (week 5): RedisRepository, not implemented yet.
+API_MODE=redis (week 5, default in Docker): RedisRepository, real batch and
+               real-time data with fallback (serving/app/redis_repository.py).
+API_MODE=mock  (week 2): fake data from MockRepository, no Redis needed.
 
 Run locally from the repository root:
   uvicorn serving.app.main:app --reload --port 8000
@@ -22,10 +23,13 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query, Request
+from fastapi.responses import JSONResponse
+from redis.exceptions import RedisError
 
 from common import CONTRACT_VERSION
 from common.config import settings
 from common.models import HealthResponse, RecommendResponse, SimilarResponse, TrendingResponse
+from serving.app.redis_repository import RedisRepository
 from serving.app.repository import MockRepository, Repository
 
 API_MODE = os.getenv("API_MODE", "mock").lower()
@@ -35,7 +39,9 @@ K_QUERY = Query(10, ge=1, le=50, description="number of items to return")
 def build_repository(redis_client) -> Repository:
     if API_MODE == "mock":
         return MockRepository(redis_ping=redis_client.ping if redis_client else None)
-    raise RuntimeError(f"API_MODE={API_MODE!r} is not implemented yet (RedisRepository arrives in week 5)")
+    if API_MODE == "redis":
+        return RedisRepository(redis_client)
+    raise RuntimeError(f"unknown API_MODE={API_MODE!r} (use redis or mock)")
 
 
 @asynccontextmanager
@@ -46,7 +52,7 @@ async def lifespan(app: FastAPI):
 
         redis_client = aioredis.Redis(
             host=settings.redis_host, port=settings.redis_port, db=settings.redis_db,
-            socket_connect_timeout=0.5, socket_timeout=0.5,
+            socket_connect_timeout=0.5, socket_timeout=0.5, decode_responses=True,
         )
     except ImportError:
         pass
@@ -62,6 +68,12 @@ app = FastAPI(
     description=f"Lambda Architecture recommender. Mode: **{API_MODE}**.",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RedisError)
+async def redis_unavailable(request: Request, exc: RedisError):
+    # Redis down or too slow: a clear 503 instead of a 500 with a stack trace.
+    return JSONResponse(status_code=503, content={"detail": f"Redis unavailable: {type(exc).__name__}"})
 
 
 @app.middleware("http")

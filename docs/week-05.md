@@ -79,3 +79,59 @@ This run still used the earlier defaults (ALS rank 64, alpha 10, `sim:item` from
 - Spark optimisation of the nightly job: ALS training and scoring take 39 minutes, so try fewer iterations, a larger block size for scoring, and caching the matrix between steps.
 - Batch demo script: a user's history next to their `rec:batch` and the `sim:item` of their last products.
 - When PR #8 (contract 1.2.0) is merged, the next run writes top-50 for 1.08 million users instead of top-100 for 566,441.
+
+## Pair 2: Real-time
+
+### 1. Weekly goals
+
+- **C:** the API reads real Redis data (`API_MODE=redis`) with the fallback logic of the plan (section 3.3).
+- **D:** `rec:rt`: real-time scores propagated through `sim:cooc` with time decay.
+- Deliverable: API serving real-time recommendations.
+
+### 2. Completed work
+
+| Task | Files | Owner |
+|---|---|---|
+| `rec:rt` sink: for each event, `rt[j] += w_e · sim(i, j) · exp(−λ·Δt)` over the top 20 neighbours of `sim:cooc:{i}`, half-life 30 min, using `common.scoring.propagate` / `time_decay`. Scores are kept decayed to the user's newest event (`rt:rect:{user}`), top 100, TTL 6 h, rewritten atomically; late events add an already decayed increment | `streaming/sinks/realtime.py` | D |
+| `rec:rt` runs after `sim:cooc` in the same micro-batch, so a new co-view is used at once; covered by the batch-id guard (not idempotent) | `streaming/main.py` | D |
+| Product attributes for the API (`rt:prod:{product}`: category, brand, price; TTL 30 days) | `streaming/sinks/products.py` | C |
+| `RedisRepository`: `rec:batch` + `rec:rt` merged with `common.scoring.merge_scores` (alpha 0.5, `API_ALPHA`), purchased products removed, short lists filled from `trend:cat` of the last viewed category → `trend:global` → `pop:global`, attributes added | `serving/app/redis_repository.py` | C |
+| `/similar` from `sim:cooc` and `sim:item` (`cooc`, `item` or `hybrid`), `/trending` with `pop:*` fallback, `/health` with `meta:batch:last_run` | `serving/app/redis_repository.py` | C |
+| Reads `user:recent` / `user:bought` both as ZSET (contract 1.1.0) and LIST / SET (1.0.0), so it works whichever version is on `master` | `serving/app/redis_repository.py` | C |
+| `503` with a clear message when Redis is unreachable | `serving/app/main.py` | C |
+| `API_MODE=redis` is the default in Docker | `infra/compose.stream.yml`, `.env.example` | C |
+| Tests: 5 new sink tests (propagation, decay over one half-life, late events, top N, attributes), 9 API tests on fakeredis (merge, bought filter, fallback chain, contract 1.0 types, similar, trending, health, HTTP 503), end-to-end test extended with `rec:rt` | `streaming/tests/`, `serving/tests/test_redis_api.py` | C, D |
+
+### 3. Results / metrics
+
+Tests: 41 / 41 pass (`streaming`, `serving`, `ingestion`) on PySpark 3.5.3 and 4.1.3.
+
+**Run on real data.** October sample (200,000 events, 2019-10-01 00:00–06:06 UTC), 4 micro-batches of 50,000 events, local Spark on 2 cores, then the API in `redis` mode on the same Redis. There is no `rec:batch` yet (Pair 1 loads it into its own stack), so `/recommend` shows the real-time path and the fallback.
+
+| Metric | Result |
+|---|---|
+| Users with `rec:rt` | 35,712 of 38,440 active users (92.9 %), 36.5 products on average |
+| Users without `rec:rt` | their products have no `sim:cooc` neighbours yet: served from `trend:cat` of the last viewed category |
+| Time per 50,000-event micro-batch | 14–25 s for the `events` query on a loaded 2-core machine (the unchanged `trending` query slowed down by the same amount) |
+| Redis memory, all Pair 2 keys of the sample | 128 MB (79 MB in week 4) |
+| Example: user 516407514 viewed smartphones 1005100 and 1004750 | `/recommend` returns five smartphones (vivo, oppo), `source` = `realtime`, with brand and price |
+| `/similar/1005115` | `cooc`: 1005105 (0.308), 1004249, 1003317, all Apple smartphones |
+| `/recommend` latency, 2,000 sequential requests on random users | server p50 2.1 ms, p95 3.3 ms, p99 4.2 ms; client p50 3.1 ms, p95 4.5 ms |
+
+The same checks on the Docker stack (Kafka source instead of a file) are repeated in the end-to-end run of week 8.
+
+### 4. Issues & resolutions
+
+| Issue | Resolution |
+|---|---|
+| Decaying every `rec:rt` score on each read would cost a write per request | Scores are stored decayed to the user's newest event; a uniform decay does not change the ranking, and the merge min-max normalises |
+| Contract 1.1.0 (ZSET user state) is still on a Pair 1 branch, `master` says LIST / SET | The API reads both types |
+| Fallback products come from sources with different scales (weighted counts, popularity) | Filled products are scored by position, strictly below the lowest merged score |
+| `/similar` first showed min-max normalised values (always 1.0 for the first product) | Raw similarity when there is one source; normalised merge only for `hybrid` |
+| The local `.env` set `API_MODE=mock`, which overrides the compose default | `API_MODE=redis` in `.env.example` and the local `.env` |
+| `rec:batch` is not in the Pair 2 stack, so the batch + real-time merge is only covered by tests | Measured with both layers in week 8 (integration) |
+
+### 5. Plan for next week
+
+- **C:** Streamlit pages 1–2: recommendation demo (recent activity, recommendations with their source, "simulate viewing product X" sending an event to Kafka) and trending / similar products.
+- **D:** load test with Locust: p50 / p95 / p99 of `/recommend` at 500–1,000 requests per second.
