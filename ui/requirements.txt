@@ -2,4 +2,4 @@ streamlit==1.67.0
 requests==2.34.2
 redis==8.1.0
 confluent-kafka==2.16.0
-pandas==3.0.5
+pandas==2.3.3            # batch/requirements.txt needs pandas<3 (PySpark 3.5); run-guide installs both into one venv
