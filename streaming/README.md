@@ -27,6 +27,8 @@ coordinates. Each query has its own checkpoint under `CHECKPOINT_LOCATION`.
 | `sinks/realtime.py` | `rec:rt`: score propagation through `sim:cooc` with time decay |
 | `sinks/products.py` | `rt:prod:*`: category, brand, price of each product (read by the API) |
 | `redis_conn.py` | One Redis client per Python worker |
+| `monitoring/exporter.py` | Prometheus exporter: stream progress, Kafka end offsets, Redis memory and keys (week 7) |
+| `evaluation/replay_eval.py` | Speed-only offline evaluation: replay through these sinks, next-item Hit Rate (week 7) |
 | `tests/` | Unit tests (fakeredis) and an end-to-end test of both queries |
 
 ## Configuration
@@ -110,3 +112,40 @@ Internal keys (Pair 2 only, `rt:` prefix): `rt:sess:*`, `rt:cooc:*`,
   middle of a batch can count some events twice.
 - The trending query has no de-duplication: Spark does not chain two stateful
   operators in update mode. Exact duplicate events add a little weight.
+
+## Monitoring (week 7)
+
+`monitoring/exporter.py` runs as the `stream-exporter` service and exposes on
+port 9108, for Prometheus:
+
+| Metric | Source |
+|---|---|
+| `stream_events_total`, `stream_batch_rows{query}`, `stream_batch_duration_seconds{query}`, `stream_batch_id{query}`, `stream_last_batch_timestamp_seconds{query}` | `rt:meta:stream` (written after each micro-batch) |
+| `stream_event_time_seconds` (stream clock), `stream_trending_window_end_seconds` | `rt:meta:stream` |
+| `kafka_topic_end_offset{topic,partition}` | Kafka: messages written to the topic (the input rate) |
+| `redis_used_memory_bytes`, `redis_keys`, `redis_keys_by_prefix{prefix}`, `redis_ops_per_second` | Redis `INFO`, `DBSIZE`, `SCAN` every minute |
+
+Grafana (http://localhost:3000, admin / admin) opens on the provisioned
+dashboard "Recommender: real-time pipeline and API" (`infra/monitoring/`).
+Spark's own view of the queries stays in the Spark UI (http://localhost:4040,
+tab *Structured Streaming*); topics, partitions and messages in Kafka UI
+(http://localhost:8085).
+
+## Speed-only evaluation (week 7)
+
+```bash
+redis-server --port 6390 --save ""          # a dedicated Redis: its database is emptied
+python -m streaming.evaluation.replay_eval --file data/raw/2019-Oct.csv \
+    --warmup-until 2019-10-02T00:00:00Z --end 2019-10-02T12:00:00Z --sample 0.25 \
+    --redis-port 6390 --json docs/eval-pair2-week07.json
+```
+
+The events are replayed in event-time order through the sinks above (the same
+code as the streaming job), grouped in micro-batches of `--batch-seconds` (60 s)
+of event time, and the lists are read with the API's `RedisRepository`. For each
+target event (a user's next product, different from the previous one), the lists
+come from the state before the micro-batch of the event. Methods: `trending`,
+`trending_cat`, `cooc_last` (neighbours of the last product only), `rec_rt`, `api`
+(what `/recommend` returns without `rec:batch`). `--half-life` and `--neighbours`
+change the `rec:rt` parameters. Results: `docs/week-07.md`.
+

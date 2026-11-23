@@ -155,3 +155,19 @@ def test_http_endpoints_and_503_when_redis_is_down(r):
         app.state.repo = RedisRepository(Down())
         resp = c.get("/recommend/7")
         assert resp.status_code == 503 and "Redis unavailable" in resp.json()["detail"]
+
+
+def test_metrics_endpoint_counts_requests_and_sources():
+    """/metrics exposes request counts by route template and recommended items by source."""
+    from fastapi.testclient import TestClient
+
+    from serving.app import main
+
+    with TestClient(main.app) as c:
+        c.get("/recommend/123?k=5")
+        c.get("/trending?k=3")
+        body = c.get("/metrics").text
+    assert 'api_requests_total{method="GET",route="/recommend/{user_id}",status="200"}' in body
+    assert 'api_request_duration_seconds_bucket{le="0.005",route="/trending"}' in body
+    assert "api_recommended_items_total" in body
+    assert 'route="/metrics"' not in body
