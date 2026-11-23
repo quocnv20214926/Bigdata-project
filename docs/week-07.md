@@ -85,3 +85,70 @@ Same split as weeks 3 to 6 (train 2019-10-01 .. 11-15, test 11-16 .. 11-30), ALS
 
 - Batch only vs batch + speed, replaying cart and purchase events of a validation day (11-09) and the test day (11-16) with the speed layer emulated (`sim:cooc`, `user:recent`, `rec:rt`) and `common.scoring.merge_scores`; choose alpha and the half-life on validation.
 - Similarity ablation for the speed layer: `sim:cooc`, `sim:item` (Item-kNN) and a hybrid of the two.
+
+## Pair 2: Real-time
+
+### 1. Weekly goals
+
+- **C:** monitoring: Prometheus metrics of the API and the speed layer, Grafana dashboard; Kafka UI.
+- **D:** speed-only evaluation: replay the events and measure the next-item Hit Rate@K.
+- Deliverable: speed-only evaluation results; monitoring dashboard.
+
+### 2. Completed work
+
+| Task | Files | Owner |
+|---|---|---|
+| API metrics at `/metrics`: requests by route template and status, latency histogram, `/recommend` requests by available layers, recommended items by source. Shared by the 2 uvicorn workers (`PROMETHEUS_MULTIPROC_DIR`) | `serving/app/metrics.py`, `serving/app/main.py`, `serving/Dockerfile` | C |
+| Speed-layer exporter: stream progress from `rt:meta:stream` (events, rows and duration of the last micro-batch, stream clock, trending window), Kafka end offsets per partition, Redis memory, keys, keys per prefix (SCAN every minute, off the scrape path) | `streaming/monitoring/exporter.py` | C |
+| Prometheus (scrape every 5 s) and Grafana 13 with a provisioned dashboard of 23 panels: overview (requests/s, `/recommend` p95 against 100 ms, 5xx rate, stream clock, time since the last micro-batch), API, speed layer (input vs processed events/s, backlog, micro-batch duration, replay speed), Redis | `infra/monitoring/`, `infra/compose.stream.yml` | C |
+| Replay evaluation through the **production code**: the events go through the real sinks (`user_state`, `products`, `cooc`, `realtime`, `trending`) on a dedicated Redis, in micro-batches of 30 s of event time; the lists are read with the API's `RedisRepository`. Every list is taken from the state before the micro-batch of the target event | `streaming/evaluation/replay_eval.py` | D |
+| Tests: 3 exporter tests, 3 replay tests (metrics, trending windows, learning a co-view on a synthetic log), 1 `/metrics` test | `streaming/tests/`, `serving/tests/` | C, D |
+
+**Protocol.** A target is an event of a user who had an event in the last 24 h, on a product different from the user's previous one (the "next item"). `unseen`: the product is not among the user's 20 recent events. Methods, top K: `trending` (`trend:global`), `trending_cat` (trending in the category of the user's last product, then global), `cooc_last` (`sim:cooc` of the last product only), `rec_rt` (`rec:rt` alone), `api` (`/recommend` without `rec:batch`: `rec:rt`, purchases removed, filled from trending). Metrics: HR@K, NDCG@K, coverage (share of targets with a non-empty list).
+
+### 3. Results / metrics
+
+Tests: 54 / 54 pass (`streaming`, `serving`, `ingestion`, `ui`).
+
+**Speed-only evaluation.** October sample (199,862 events, Oct 1 00:00–06:06), first 3 hours as warm-up, half of the users evaluated: 47,310 targets (47,283 views, 23 purchases, 4 carts). `rec:rt` half-life 5 minutes (best value, see below), 20 neighbours per event. `docs/eval-pair2-week07.json`.
+
+| Method | Coverage | HR@10 | NDCG@10 | HR@20 | NDCG@20 |
+|---|---:|---:|---:|---:|---:|
+| `trending` | 100 % | 0.0397 | 0.0197 | 0.0605 | 0.0250 |
+| `trending_cat` | 100 % | 0.1601 | 0.0817 | 0.2410 | 0.1020 |
+| `cooc_last` | 94.7 % | 0.1902 | **0.1079** | 0.2539 | 0.1239 |
+| `rec_rt` | 95.1 % | 0.1901 | 0.1021 | 0.2625 | 0.1204 |
+| **`api`** | 100 % | **0.1964** | 0.1050 | **0.2769** | **0.1253** |
+
+| Unseen products only (40,352 targets) | HR@10 | HR@20 |
+|---|---:|---:|
+| `trending_cat` | 0.1272 | 0.1997 |
+| `cooc_last` | 0.1279 | 0.1813 |
+| `rec_rt` | 0.1283 | 0.1889 |
+| `api` | **0.1364** | **0.2056** |
+
+- What users get from the speed layer (`api`) finds the next product in the top 10 for **19.6 %** of the targets: 5× global trending and +23 % over trending in the user's category.
+- `rec:rt` alone equals the neighbours of the last product at K = 10 and is better at K = 20 and on unseen products: the decayed history adds candidates beyond the last product. The fallback adds the 5 % of targets without `rec:rt` (products with no co-views yet).
+- Purchases (23 targets, too few for a conclusion): `rec:rt` HR@10 0.30 against 0.04 for trending in the category.
+
+**Half-life of `rec:rt`** (same replay, `docs/eval-pair2-week07-halflife-*.json`):
+
+HALF_LIFE_TABLE
+
+**Monitoring.** The API and exporter metrics were checked on the local run (the dashboard's 25 PromQL expressions parse, every metric they use is exposed; `kafka_topic_end_offset` needs Kafka, so it is only seen in Docker). The dashboard itself has to be checked in Docker (section 4 of `docs/run-guide.md`).
+
+### 4. Issues & resolutions
+
+| Issue | Resolution |
+|---|---|
+| A separate simulation of the speed layer could drift from the real job | The replay runs the production sinks and the API's repository; only Spark's grouping into micro-batches and the trending aggregation are re-done in Python |
+| First results favoured `cooc_last`: it used the event just before the target even when that event was in the same micro-batch, which `rec:rt` cannot have seen yet | Every method now reads the user's last product from `user:recent`, i.e. the same state as `rec:rt` |
+| With the default half-life (30 min) `rec:rt` was below `cooc_last` | Next-item intent changes within minutes; half-life tuned on the replay (table above) |
+| The replay runs about 400–500 events/s on 2 cores (the real sinks, one micro-batch at a time) | `--warmup-batch-seconds` (600 s) for the warm-up, `--sample` for the evaluated users; the full-day run is part of the run guide |
+| Spark does not commit offsets to Kafka, so there is no consumer lag metric | The exporter publishes the topic's end offsets and the processed events; the dashboard shows both rates and the approximate backlog |
+| Two uvicorn workers would each expose their own counters | Prometheus multiprocess mode (`PROMETHEUS_MULTIPROC_DIR`, emptied at each start) |
+
+### 5. Plan for next week
+
+- **C:** integration in the API (batch + real-time merge with Pair 1's `rec:batch`), Streamlit page 3 (evaluation results).
+- **D:** end-to-end compose of the whole system, `sim:item` in real-time scoring (`cooc` / `item` / `hybrid`).

@@ -97,6 +97,7 @@ services:
       MAX_OFFSETS_PER_TRIGGER: ${MAX_OFFSETS_PER_TRIGGER:-50000}
       TRIGGER_SECONDS: ${TRIGGER_SECONDS:-2}
       RT_SIMILARITY: ${RT_SIMILARITY:-cooc}       # rec:rt neighbours: cooc | item | hybrid (week 8)
+      RT_HALF_LIFE_SECONDS: ${RT_HALF_LIFE_SECONDS:-300}   # rec:rt half-life (week 8: 5 min)
     ports:
       - "4040:4040"
     volumes:
@@ -115,6 +116,7 @@ services:
         condition: service_healthy
     environment:
       API_MODE: ${API_MODE:-redis}
+      API_ALPHA: ${API_ALPHA:-0.1}     # weight of rec:batch in the merge (week 8, docs/week-08.md)
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:

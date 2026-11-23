@@ -92,3 +92,46 @@ By group on the test day (NDCG@10):
 
 - Scale test: the nightly batch on 6, 12, 23 and 46 days of data (time and sizes per step).
 - Final report sections for the batch layer and the evaluation.
+
+## Pair 2: Real-time
+
+### 1. Weekly goals
+
+- **C:** merge the batch scores into the API (integration with Pair 1's `rec:batch`), Streamlit page 3 (evaluation results).
+- **D:** end-to-end compose of the whole system; `sim:item` in the real-time scoring.
+- Deliverable: integrated end-to-end system.
+
+### 2. Completed work
+
+| Task | Files | Owner |
+|---|---|---|
+| Whole system with one command: `dcall up -d --build` (PowerShell, `scripts/load-env.ps1`) or `scripts/stack.sh up -d --build` = base + batch + stream compose files | `scripts/load-env.ps1`, `scripts/stack.sh` | D |
+| `scripts/check_stack.py`: one line per check along the data flow (Redis, streaming progress, keys of both pairs, every API endpoint with a known and an unknown user, UI, Prometheus targets, Grafana, Kafka UI) | `scripts/check_stack.py` | D |
+| `rec:rt` neighbours from `sim:cooc`, `sim:item` or both (`RT_SIMILARITY=cooc\|item\|hybrid`, hybrid = 0.5 · cooc + 0.5 · item) | `streaming/sinks/realtime.py` | D |
+| Defaults set from the two replays: `rec:rt` half-life **5 minutes** (`RT_HALF_LIFE_SECONDS=300`, was 30) and batch weight **alpha = 0.1** in the API merge (`API_ALPHA`, was 0.5). Pair 1's replay (above) chose alpha 0.1 and 5 min on products the user has never touched, where the speed layer triples ALS; our replay also ranks 5 min first | `infra/compose.stream.yml`, `.env.example` | C, D |
+| The batch + real-time merge itself was already in `RedisRepository` (week 5): `source` = `batch` / `realtime` / `both`, purchases removed, trending fallback. Checked by `check_stack.py` once Pair 1's nightly batch has loaded Redis | `serving/app/redis_repository.py` | C |
+| Streamlit page 3: speed-only replay (by target group and K), half-life sweep, similarity ablation, Pair 1's batch evaluation by segment and metric, load test | `ui/views/evaluation.py` | C |
+| Leakage-free `sim:item` for the Pair 2 replay: Pair 1's Item-kNN (same code and parameters) on the warm-up day only; `replay_eval.py --sim-item ... --rt-similarity item\|hybrid` | `streaming/evaluation/build_sim_item.py`, `streaming/evaluation/replay_eval.py` | D |
+| Run guide and demo script | `docs/run-guide.md` | C, D |
+| Merged Pair 1's branches `hien/week8-replay` and `hien/week10-scale` (no conflicts), so the week 8–10 reports of both pairs are in the same files | | |
+
+### 3. Results / metrics
+
+Tests: 54 / 54 Pair 2 tests pass (`streaming`, `serving`, `ingestion`, `ui`; the Spark end-to-end test included). Pair 1's `evaluation/tests/test_replay.py` needs Java 17 for Arrow (3 of its 14 tests fail on Java 21 in our environment, unrelated to this change).
+
+**Similarity ablation.** Pair 1's replay on the full data answers it: `sim:cooc`, `sim:item` and the hybrid are within 0.001–0.003 NDCG@10 of each other, `sim:cooc` slightly ahead (table above). `RT_SIMILARITY` therefore stays `cooc`, which also keeps the speed layer independent of the batch layer. The same ablation with the Pair 2 replay (the production sinks, 12 h of October 2 after a warm-up day, `sim:item` from October 1 only: 486,828 pairs for 32,729 products) is in the run guide (section 4) and still has to be run on the team machine.
+
+**Docker end-to-end run.** To be filled after the run on the team machine: output of `python scripts/check_stack.py` with the whole system up and Pair 1's batch loaded (sources `both` in `/recommend`), screenshot of the Grafana dashboard during the live replay.
+
+### 4. Issues & resolutions
+
+| Issue | Resolution |
+|---|---|
+| The two replays (Pair 1: carts and new products; Pair 2: next item) pull alpha in different directions: carts want the batch list, new products the speed list | alpha 0.1, half-life 5 min: the discovery case, where the system adds most over batch only. Carts are mostly products just viewed (98 %), which the Streamlit page already shows as "Recent activity" |
+| `rec:batch` is only in Redis after Pair 1's nightly run, which needs the full stack and the clean Parquet | `check_stack.py` reports the batch keys as a warning, not a failure: without them the API serves real-time + trending, as designed |
+| Pair 1's `evaluation/replay.py` and our `streaming/evaluation/replay_eval.py` both replay the speed layer | Different questions: theirs emulates the speed layer inside Spark for batch + speed on the full test days; ours runs the production sinks and the API code, event by event, for the next item. Both agree on the half-life and on the similarity |
+
+### 5. Plan for next week
+
+- Final report sections of Pair 2 (speed layer, serving, UI, Lambda vs Kappa) and slides.
+- Docker end-to-end run and the replays on the team machine; numbers into weeks 7 and 8.

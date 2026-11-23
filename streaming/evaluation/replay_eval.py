@@ -64,7 +64,6 @@ import redis.asyncio as aioredis
 
 from common import redis_keys as rk
 from common.config import settings
-from common.scoring import DEFAULT_HALF_LIFE_SECONDS
 from common.weights import event_weight
 from ingestion.replayer import read_events
 from serving.app.redis_repository import RedisRepository, product_key
@@ -383,7 +382,7 @@ def main() -> None:
     p.add_argument("--batch-seconds", type=int, default=30, help="event time per micro-batch")
     p.add_argument("--warmup-batch-seconds", type=int, default=600,
                    help="event time per micro-batch before --warmup-until (state only)")
-    p.add_argument("--half-life", type=float, default=DEFAULT_HALF_LIFE_SECONDS, help="seconds")
+    p.add_argument("--half-life", type=float, default=rt_sink.RT_HALF_LIFE_SECONDS, help="seconds")
     p.add_argument("--neighbours", type=int, default=rt_sink.RT_NEIGHBOURS, help="K of sim:cooc per event")
     p.add_argument("--rt-similarity", choices=rt_sink.SIMILARITIES, default="cooc",
                    help="neighbours used by rec:rt (item / hybrid need --sim-item)")
