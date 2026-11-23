@@ -84,21 +84,22 @@ if activity is not None and not activity.empty:
 
 s1, s2, s3 = st.columns([2, 1, 1])
 with s1:
-    product_id = st.selectbox("Product (recommended or recently seen), or type another below",
-                              choices or [1005100], index=0)
-    typed = st.text_input("Other product ID", "")
-    if typed.strip().isdigit():
-        product_id = int(typed.strip())
+    picked = st.selectbox("Product: pick a recommended or recently seen one, or type any product ID and press Enter",
+                          choices or [1005100], index=0, accept_new_options=True)
+    product_id = int(str(picked).strip()) if str(picked).strip().isdigit() else None
+    if product_id is None:
+        st.error(f"Not a product ID: {picked!r}")
 with s2:
     event_type = st.radio("Event type", ["view", "cart", "purchase"], horizontal=False)
 with s3:
     st.write("")
-    send = st.button(f"Send {event_type} of {product_id}", type="primary", width="stretch")
+    send = st.button(f"Send {event_type} of {product_id}" if product_id else "Send",
+                     type="primary", width="stretch", disabled=product_id is None)
 
 if send:
     st.session_state.before = {"user": user_id, "ids": [] if err else [i["product_id"] for i in data["items"]]}
     try:
-        event = h.send_event(user_id, int(product_id), event_type)
+        event = h.send_event(user_id, product_id, event_type)
     except Exception as exc:
         st.error(f"Could not publish the event: {exc}")
     else:

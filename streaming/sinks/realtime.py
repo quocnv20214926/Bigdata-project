@@ -4,7 +4,9 @@ Plan, section 3.3: for an event of type e by a user on product i,
 
     rt[j] += w_e * sim(i, j) * exp(-lambda * dt)    for j in the top-K of sim:cooc:{i}
 
-with lambda = ln 2 / half-life (30 minutes, common.scoring.DEFAULT_HALF_LIFE_SECONDS)
+with lambda = ln 2 / half-life (RT_HALF_LIFE_SECONDS, default 5 minutes since week 8:
+best on both replays, docs/week-07.md (Pair 2) and docs/week-08.md (Pair 1), where
+common.scoring.DEFAULT_HALF_LIFE_SECONDS = 30 minutes ranked lower)
 and w_e from common.weights (view 1, cart 3, purchase 5). The arithmetic is
 common.scoring.time_decay / propagate, the same code the offline evaluation uses.
 
@@ -39,13 +41,14 @@ from collections import defaultdict
 from typing import Iterable
 
 from common import redis_keys as rk
-from common.scoring import DEFAULT_HALF_LIFE_SECONDS, propagate, time_decay
+from common.scoring import propagate, time_decay
 
 RT_NEIGHBOURS = 20     # K: neighbours of sim:cooc:{i} used per event
 RT_TOP_N = 100         # products kept in rec:rt per user
 MIN_SCORE = 1e-6       # smaller scores are dropped (about 20 half-lives)
 SIMILARITIES = ("cooc", "item", "hybrid")
 RT_SIMILARITY = os.getenv("RT_SIMILARITY", "cooc")
+RT_HALF_LIFE_SECONDS = float(os.getenv("RT_HALF_LIFE_SECONDS", "300"))
 
 
 def combine_neighbours(cooc: dict[int, float], item: dict[int, float], similarity: str, k: int) -> dict[int, float]:
@@ -66,7 +69,7 @@ def ref_key(user_id) -> str:
 
 
 def update_realtime(rows: Iterable, r, k: int = RT_NEIGHBOURS, top_n: int = RT_TOP_N,
-                    half_life: float = DEFAULT_HALF_LIFE_SECONDS, similarity: str | None = None) -> int:
+                    half_life: float = RT_HALF_LIFE_SECONDS, similarity: str | None = None) -> int:
     """Apply events (fields user_id, product_id, event_type, epoch), sorted by
     user and time, to rec:rt. Returns the number of users written."""
     by_user: dict[int, list] = defaultdict(list)

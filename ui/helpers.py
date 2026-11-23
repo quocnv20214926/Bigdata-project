@@ -87,10 +87,13 @@ def product_attrs(product_ids) -> dict[int, dict]:
     ids = [int(p) for p in product_ids]
     if not ids:
         return {}
-    pipe = get_redis().pipeline(transaction=False)
-    for pid in ids:
-        pipe.hgetall(f"rt:prod:{pid}")
-    return dict(zip(ids, pipe.execute()))
+    try:
+        pipe = get_redis().pipeline(transaction=False)
+        for pid in ids:
+            pipe.hgetall(f"rt:prod:{pid}")
+        return dict(zip(ids, pipe.execute()))
+    except redis.RedisError:            # attributes are optional: the page still shows the API results
+        return {}
 
 
 def recent_activity(user_id: int, n: int = 20) -> pd.DataFrame:
@@ -108,7 +111,7 @@ def recent_activity(user_id: int, n: int = 20) -> pd.DataFrame:
     attrs = product_attrs(r["product_id"] for r in rows)
     for row in rows:
         a = attrs.get(row["product_id"], {})
-        row.update(category=a.get("category_code") or a.get("category_id"), brand=a.get("brand"),
+        row.update(category=category_label(a.get("category_code"), a.get("category_id")), brand=a.get("brand") or "",
                    price=float(a["price"]) if a.get("price") else None)
     return pd.DataFrame(rows, columns=["time (UTC)", "event", "product_id", "category", "brand", "price", "epoch"])
 
@@ -165,22 +168,42 @@ def send_event(user_id: int, product_id: int, event_type: str) -> Event:
 
 
 def wait_for_event(user_id: int, event: Event, timeout: float = 30.0) -> Optional[float]:
-    """Seconds until the streaming job wrote the event into user:recent, or None."""
-    member = rk.encode_recent(event.product_id, event.event_type, int(event.event_time.timestamp()))
+    """Seconds until the speed layer has fully applied the event, or None.
+
+    In one micro-batch the job writes user:recent first, then sim:cooc and rec:rt
+    (streaming/main.py). Seeing the event in user:recent is therefore not enough:
+    we also wait until rec:rt has been rewritten for it, i.e. its reference time
+    rt:rect:{user} (written in the same transaction as rec:rt) reaches the event
+    time. If the user has no rec:rt (no neighbours at all), user:recent suffices.
+    """
+    epoch = int(event.event_time.timestamp())
+    member = rk.encode_recent(event.product_id, event.event_type, epoch)
     r = get_redis()
     started = time.time()
     while time.time() - started < timeout:
         try:
             if r.zscore(rk.user_recent(user_id), member) is not None:
-                return time.time() - started
+                ref = r.get(f"rt:rect:{user_id}")
+                if (ref is not None and int(ref) >= epoch) or not r.exists(rk.rec_rt(user_id)):
+                    return time.time() - started
         except redis.RedisError:
             pass
-        time.sleep(0.5)
+        time.sleep(0.25)
     return None
+
+
+def category_label(code, category_id) -> str:
+    """category_code when the data has one (a third of the events have none), else the id."""
+    if code:
+        return str(code)
+    return f"(no code) {category_id}" if category_id else ""
 
 
 def items_frame(items: list[dict]) -> pd.DataFrame:
     cols = ["product_id", "score", "source", "category_code", "brand", "price", "category_id"]
     df = pd.DataFrame(items, columns=cols)
+    df["category"] = [category_label(c, i) for c, i in zip(df["category_code"], df["category_id"])]
+    df["brand"] = df["brand"].fillna("")
+    df = df[["product_id", "score", "source", "category", "brand", "price"]]
     df.insert(0, "rank", range(1, len(df) + 1))
     return df

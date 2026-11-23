@@ -14,10 +14,10 @@ k = st.sidebar.slider("Number of products", 1, 50, 10, key="explore_k")
 tab_trend, tab_similar = st.tabs(["Trending (1 hour window)", "Similar products"])
 
 with tab_trend:
-    st.caption("trend:global / trend:cat:{category} from the speed layer (weighted counts view 1, cart 3, "
+    st.caption("`trend:global` / `trend:cat:{category}` from the speed layer (weighted counts view 1, cart 3, "
                "purchase 5 over the last hour of event time, sliding every 5 minutes). "
                "When a category had no activity in the last hour the API falls back to long-term popularity "
-               "(pop:*, Pair 1).")
+               "(`pop:*`, Pair 1).")
     glob, ms, err = h.api_get("/trending", k=50)
     if err:
         st.error(err)
@@ -46,20 +46,21 @@ with tab_trend:
         st.caption(f"{len(items)} products · source: {source} · API {latency:.1f} ms")
         if items:
             df = h.items_frame(items).rename(columns={"score": "weighted count"})
-            st.bar_chart(df.set_index(df["product_id"].astype(str))["weighted count"], horizontal=True)
+            chart = df.assign(product=df["product_id"].astype(str))
+            st.bar_chart(chart, x="product", y="weighted count", horizontal=True, sort="-weighted count")
             st.dataframe(df, hide_index=True, width="stretch")
         else:
             st.info("Nothing trending: the stream has not processed events for this category in the last hour.")
 
 with tab_similar:
-    st.caption("sim:cooc (speed layer: products viewed in the same session, normalised co-occurrence) and "
+    st.caption("`sim:cooc` (speed layer: products viewed in the same session, normalised co-occurrence) and "
                "sim:item (batch layer: Item-kNN cosine). With both, the API returns a hybrid list.")
     default = glob["items"][0]["product_id"] if glob.get("items") else 1005100
     pid = st.number_input("Product ID", min_value=1, value=int(default), step=1)
     data, ms, err = h.api_get(f"/similar/{int(pid)}", k=k)
     attrs = h.product_attrs([pid]).get(int(pid), {})
     if attrs:
-        st.write(f"**{pid}**: {attrs.get('category_code') or attrs.get('category_id')}, "
+        st.write(f"**{pid}**: {h.category_label(attrs.get('category_code'), attrs.get('category_id'))}, "
                  f"{attrs.get('brand') or 'no brand'}, {attrs.get('price')}")
     if err:
         st.error(err)

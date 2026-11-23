@@ -23,3 +23,4 @@ derby.log
 .vscode/
 .idea/
 .DS_Store
+_transfer/

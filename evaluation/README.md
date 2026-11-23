@@ -10,6 +10,7 @@ Compares recommendation models on the time-based split. Code follows the contrac
 | `similarity.py` | `sim:item` (ALS item factors) vs Item-kNN: size, overlap, same category, next-item hit rate, item-based metrics |
 | `bootstrap.py` | 95% percentile bootstrap intervals over users, and paired intervals for the difference of two models |
 | `final_eval.py` | Final evaluation (week 7): the three models with bootstrap intervals, by user segment, with and without already-seen products |
+| `replay.py` | Batch only vs batch + speed (week 8): cart and purchase events replayed with the speed layer emulated, `common.scoring.merge_scores`, alpha and half-life chosen on validation, cooc / item / hybrid similarity |
 | `tests/` | Metric checks against hand-computed values, and an end-to-end run on tiny data |
 
 ## Protocol
@@ -89,4 +90,33 @@ Same split, ground truth and metrics as above, with three additions.
 ```bash
 SPARK_DRIVER_MEMORY=14g python -m evaluation.final_eval --report docs/eval-week07.json
 python -m evaluation.final_eval --input data/clean/events --no-s3 --eval-users 20000 --segment-users 5000
+```
+
+## Batch only vs batch + speed (week 8)
+
+The experiment of `docs/plan.md` section 7: at each cart or purchase event, the list the API would
+have returned just before it. The API's Redis mode is not on `master` yet, so the replay runs the
+functions of `common/scoring.py` that it will use.
+
+| Item | Choice |
+|---|---|
+| Days | validation 2019-11-09 (models from 10-01 .. 11-08), test 2019-11-16 (models from 10-01 .. 11-15): the morning after a nightly run |
+| Targets | one cart or purchase event per user on the day, 30,000 users (`--targets`); relevant product = the product of that event |
+| `--targets-mode new` | almost every cart is for a product already in `user:recent` (29,438 of 30,000 on 11-16), so the plan's targets mostly measure showing the products just viewed again. This mode takes instead one event per user whose product the user has never touched before, and leaves every product touched before the target out of every list (week 7's "unseen" filter): `rec:batch` is the ALS top 50 without them, out of the top 150, and `rec:rt` the top 50 without them. There are no "+self" variants, since the `user:recent` products are left out |
+| Batch layer | ALS top 50 with scores (`rec:batch`), Item-kNN top 50 (`sim:item`), `pop:global`, all from the events before the day |
+| `sim:cooc` | counted as `streaming/sinks/cooc.py` does (last 10 distinct products of a session, `cooc / sqrt(cnt_i * cnt_j)`, clipped at 1, top 50), from the events before the day, so frozen like `sim:item`; a test checks the counts and similarities against the streaming code |
+| `user:recent`, `user:bought` | the user's 20 newest events before the target, if the newest is under 24 h old; the products bought before it, if the last purchase is under 30 days old |
+| `rec:rt` | `rt[j] = sum of w_e * sim(i, j) * exp(-ln 2 * age / half_life)` over the `user:recent` events (`common.scoring.propagate`), top 50 |
+| Variants | popularity only; batch only; speed only; batch + speed for alpha 0.1 .. 0.9 and 0.95; each with similarity cooc, item or hybrid (0.5 * item + 0.5 * cooc), each also "+self" (sim(i, i) = 1 added for the `user:recent` products, so `rec:rt` holds the products just viewed, which `propagate` leaves out), and half-life 5 min, 30 min, 2 h, 12 h or 24 h. Lists come from `merge_scores` (min-max per source; alpha 1 without `rec:rt`, 0 without `rec:batch`), without `user:bought`, completed with `pop:global` |
+| Selection | for each similarity, the half-life (speed only) and the half-life and alpha (batch + speed) with the best NDCG@10 on the validation day; the test day reports those with 95% bootstrap intervals over targets and paired differences, plus the whole grid |
+| Groups | targets whose user has `rec:batch` and `user:recent`, only one of them, or neither; the report also counts the targets whose product is already in `user:recent` or in `rec:batch` |
+
+```bash
+SPARK_DRIVER_MEMORY=14g python -m evaluation.replay --report docs/eval-week08-replay.json --cache-dir /tmp/replay-days
+# one Spark process per day (less disk for shuffle files), then the report from the two saved days
+python -m evaluation.replay --cache-dir /tmp/replay-days --only validation
+python -m evaluation.replay --cache-dir /tmp/replay-days --only test
+python -m evaluation.replay --cache-dir /tmp/replay-days --report docs/eval-week08-replay.json
+# products the user has never touched (the days are saved as validation-new and test-new)
+SPARK_DRIVER_MEMORY=14g python -m evaluation.replay --targets-mode new --report docs/eval-week08-new.json --cache-dir /tmp/replay-days
 ```

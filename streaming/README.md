@@ -88,7 +88,7 @@ only moves to the front. Similarity = `cooc(i, j) / sqrt(cnt(i) · cnt(j))`
 
 **`rec:rt`.** For an event of type *e* on product *i*:
 `rt[j] += w_e · sim(i, j) · exp(−λ·Δt)` for the top 20 neighbours *j* in
-`sim:cooc:{i}`, half-life 30 minutes (`common.scoring.propagate`, `time_decay`).
+`sim:cooc:{i}` (or `sim:item` / both, `RT_SIMILARITY`), half-life 5 minutes (`RT_HALF_LIFE_SECONDS`; `common.scoring.propagate`, `time_decay`).
 Stored scores are decayed to the user's newest event (`rt:rect:{user_id}`); a newer
 event first multiplies them by `exp(−λ·Δt)`. All scores of a user decay by the same
 factor, so the ranking does not depend on the reading time and the API needs no

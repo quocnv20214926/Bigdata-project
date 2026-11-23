@@ -18,13 +18,14 @@ import streamlit as st
 
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 
-METHOD_LABELS = {
-    "trending": "Trending (last hour, global)",
-    "trending_cat": "Trending in the last category",
-    "cooc_last": "sim:cooc of the last product",
-    "rec_rt": "rec:rt (decayed propagation)",
-    "api": "/recommend (rec:rt + fallback)",
+METHOD_LABELS = {          # short: they label the bars
+    "trending": "Trending (global)",
+    "trending_cat": "Trending (category)",
+    "cooc_last": "sim:cooc (last product)",
+    "rec_rt": "rec:rt",
+    "api": "/recommend",
 }
+PERCENT = st.column_config.NumberColumn(format="percent")
 
 
 def load(name: str):
@@ -52,7 +53,8 @@ with tab_speed:
         st.info("docs/eval-pair2-week07.json not found (streaming/evaluation/replay_eval.py).")
     else:
         cfg, stats = res["config"], res["stats"]
-        st.caption(f"Replay of {stats['events']:,} events, evaluated after {cfg['warmup_until']} until {cfg['end']}; "
+        until = cfg["end"] or "the end of the file"
+        st.caption(f"Replay of {stats['events']:,} events, evaluated from {cfg['warmup_until']} until {until}; "
                    f"micro-batches of {cfg['batch_seconds']} s of event time; rec:rt half-life "
                    f"{cfg['half_life_seconds'] / 60:.0f} min, {cfg['neighbours']} neighbours per event; "
                    f"{stats['targets']:,} target events ({cfg['sample']:.0%} of users). A target is a user's next "
@@ -62,8 +64,11 @@ with tab_speed:
                                          if g in res["results"]])
         k = c2.selectbox("K", cfg["k"], index=0)
         df = speed_table(res, group, k)
-        st.bar_chart(df.set_index("method")[[f"HR@{k}"]], horizontal=True)
-        st.dataframe(df, hide_index=True, width="stretch")
+        st.bar_chart(df, x="method", y=f"HR@{k}", horizontal=True, sort=f"-HR@{k}")
+        st.caption("Methods: trending of the last hour in the whole shop or in the category of the user's last "
+                   "product; sim:cooc of the last product only; rec:rt alone; /recommend = what the API returns "
+                   "(rec:rt, purchases removed, filled from trending).")
+        st.dataframe(df, hide_index=True, width="stretch", column_config={"coverage": PERCENT})
 
     sweep = [load(f"eval-pair2-week07-halflife-{m}.json") for m in (5, 15, 30, 120)]
     sweep = [s for s in sweep if s]
@@ -93,8 +98,9 @@ with tab_sim:
         st.caption("Same replay, rec:rt built from sim:cooc (speed layer), sim:item (Item-kNN of the batch layer, "
                    "trained only on the warm-up day) or both (0.5 / 0.5).")
         df = pd.DataFrame(rows)
-        st.bar_chart(df[df["list"] == METHOD_LABELS["api"]].set_index("rec:rt similarity")[["HR@10", "NDCG@10"]])
-        st.dataframe(df, hide_index=True, width="stretch")
+        st.bar_chart(df[df["list"] == METHOD_LABELS["api"]].set_index("rec:rt similarity")[["HR@10", "NDCG@10"]],
+                     stack=False)
+        st.dataframe(df, hide_index=True, width="stretch", column_config={"coverage": PERCENT})
 
 with tab_batch:
     res = load("eval-week07.json")
