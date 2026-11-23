@@ -73,7 +73,7 @@ demo script and the measurements to rerun, is [docs/run-guide.md](docs/run-guide
 
 - [Project plan](docs/plan.md) and [team assignment](docs/assignment.md)
 - Weekly reports: `docs/week-01.md` to `docs/week-10.md`
-- [Run guide and demo script](docs/run-guide.md)
+- [Demo guide](docs/demo-guide.md) and [run guide](docs/run-guide.md)
 - [Final report, Pair 2 sections](docs/report-pair2.md)
 - Each folder has a README explaining how to run it
 
