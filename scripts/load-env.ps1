@@ -18,6 +18,9 @@ foreach ($line in Get-Content $envFile) {
 }
 Write-Host "Loaded $count variables from .env"
 
-# Shortcut for the real-time stack (reads the same .env)
+# Shortcuts (read the same .env):
+#   dc     real-time stack (Pair 2): Redis, Kafka, streaming, API, UI, monitoring
+#   dcall  whole system (week 8): + Airflow of Pair 1 (Spark cluster: add --profile spark-cluster)
 function global:dc { docker compose --env-file .env -f infra/compose.base.yml -f infra/compose.stream.yml @args }
-Write-Host "Command 'dc' is ready, e.g.  dc up -d --build"
+function global:dcall { docker compose --env-file .env -f infra/compose.base.yml -f infra/compose.batch.yml -f infra/compose.stream.yml @args }
+Write-Host "Commands 'dc' (real-time stack) and 'dcall' (whole system) are ready, e.g.  dcall up -d --build"

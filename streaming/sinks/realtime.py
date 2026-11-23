@@ -20,13 +20,21 @@ time, and the API min-max normalises scores before merging: no decay is needed
 when reading.
 
 An event older than the stored reference (late data) adds its increment already
-decayed by its age. The update reads and rewrites the ZSET, so it is not
+decayed by its age.
+
+Similarity source (week 8, RT_SIMILARITY):
+  cooc    sim:cooc only (default: the speed layer does not depend on the batch layer)
+  item    sim:item only (Pair 1, Item-kNN, nightly)
+  hybrid  0.5 * sim:cooc + 0.5 * sim:item; a product missing from one list counts 0
+          there, so products in both lists rank first
+The top K of the chosen source are the neighbours of each event. The update reads and rewrites the ZSET, so it is not
 idempotent: main.py skips micro-batches that were already committed.
 """
 
 from __future__ import annotations
 
 import heapq
+import os
 from collections import defaultdict
 from typing import Iterable
 
@@ -36,6 +44,21 @@ from common.scoring import DEFAULT_HALF_LIFE_SECONDS, propagate, time_decay
 RT_NEIGHBOURS = 20     # K: neighbours of sim:cooc:{i} used per event
 RT_TOP_N = 100         # products kept in rec:rt per user
 MIN_SCORE = 1e-6       # smaller scores are dropped (about 20 half-lives)
+SIMILARITIES = ("cooc", "item", "hybrid")
+RT_SIMILARITY = os.getenv("RT_SIMILARITY", "cooc")
+
+
+def combine_neighbours(cooc: dict[int, float], item: dict[int, float], similarity: str, k: int) -> dict[int, float]:
+    """The top-k neighbours of one product for the chosen similarity source."""
+    if similarity == "cooc":
+        scores = cooc
+    elif similarity == "item":
+        scores = item
+    elif similarity == "hybrid":
+        scores = {j: 0.5 * cooc.get(j, 0.0) + 0.5 * item.get(j, 0.0) for j in set(cooc) | set(item)}
+    else:
+        raise ValueError(f"unknown similarity {similarity!r} (use one of {SIMILARITIES})")
+    return dict(heapq.nlargest(k, scores.items(), key=lambda kv: kv[1]))
 
 
 def ref_key(user_id) -> str:
@@ -43,7 +66,7 @@ def ref_key(user_id) -> str:
 
 
 def update_realtime(rows: Iterable, r, k: int = RT_NEIGHBOURS, top_n: int = RT_TOP_N,
-                    half_life: float = DEFAULT_HALF_LIFE_SECONDS) -> int:
+                    half_life: float = DEFAULT_HALF_LIFE_SECONDS, similarity: str | None = None) -> int:
     """Apply events (fields user_id, product_id, event_type, epoch), sorted by
     user and time, to rec:rt. Returns the number of users written."""
     by_user: dict[int, list] = defaultdict(list)
@@ -60,12 +83,20 @@ def update_realtime(rows: Iterable, r, k: int = RT_NEIGHBOURS, top_n: int = RT_T
     for u in users:
         pipe.zrange(rk.rec_rt(u), 0, -1, withscores=True)
         pipe.get(ref_key(u))
+    similarity = similarity or RT_SIMILARITY
+    sources = {"cooc": [rk.sim_cooc], "item": [rk.sim_item], "hybrid": [rk.sim_cooc, rk.sim_item]}[similarity]
     for p in products:
-        pipe.zrevrange(rk.sim_cooc(p), 0, k - 1, withscores=True)
+        for key in sources:
+            pipe.zrevrange(key(p), 0, k - 1, withscores=True)
     res = pipe.execute()
     state = {u: (dict(res[2 * n]), res[2 * n + 1]) for n, u in enumerate(users)}
     base = 2 * len(users)
-    neighbours = {p: {int(j): float(s) for j, s in res[base + n]} for n, p in enumerate(products)}
+    neighbours = {}
+    for n, p in enumerate(products):
+        lists = [{int(j): float(s) for j, s in res[base + len(sources) * n + m]} for m in range(len(sources))]
+        cooc = lists[0] if similarity != "item" else {}
+        item = lists[-1] if similarity != "cooc" else {}
+        neighbours[p] = combine_neighbours(cooc, item, similarity, k)
 
     # 2. Replay each user's events in time order.
     pipe = r.pipeline(transaction=True)      # readers never see a half-written key

@@ -10,8 +10,8 @@ speed layer, on a dedicated Redis:
     streaming.sinks.trending    -> trend:cat, trend:global   (1 h window, 5 min slide)
 
 and the lists are read back with the API's own RedisRepository. Events are grouped
-in micro-batches of --batch-seconds of event time (default 60 s, a replay at 30x
-with the 2 s trigger of Docker). For every target event in a micro-batch, the
+in micro-batches of --batch-seconds of event time (default 30 s: a replay at 15x
+with the 2 s trigger of the streaming job). For every target event in a micro-batch, the
 recommendations are taken from the state left by the *previous* micro-batches,
 i.e. what the API would have answered just before the event, then the
 micro-batch is applied.
@@ -28,6 +28,11 @@ Methods compared, top K:
   rec_rt            rec:rt alone (empty for users whose products have no co-views)
   api               /recommend without rec:batch: rec:rt, purchased products removed,
                     filled from trend:cat -> trend:global -> pop:global (what users get)
+
+With --sim-item FILE (product_id,neighbour_id,sim; streaming/evaluation/build_sim_item.py),
+sim:item is loaded before the replay and --rt-similarity item|hybrid makes rec:rt use it
+(week 8 ablation cooc / item / hybrid). The file must be built from events before
+--warmup-until, or the evaluation leaks the future.
 
 Metrics: HR@K (target in the top K), NDCG@K (1 / log2(1 + rank)), coverage (share of
 targets for which the method returned at least one product).
@@ -178,7 +183,8 @@ def apply_batch(rows: list, r: redis.Redis, trend: TrendWindows, args) -> None:
     write_user_state(rows, r)
     write_products(rows, r)
     write_partition_cooc(rows, r)
-    rt_sink.update_realtime(rows, r, k=args.neighbours, half_life=args.half_life)
+    rt_sink.update_realtime(rows, r, k=args.neighbours, half_life=args.half_life,
+                            similarity=getattr(args, "rt_similarity", "cooc"))
     totals = trend.add_batch(rows)
     if totals:
         write_window_totals(totals, r)
@@ -186,19 +192,56 @@ def apply_batch(rows: list, r: redis.Redis, trend: TrendWindows, args) -> None:
         publish(end, {t.category_id for t in totals if t.window_end == end}, r)
 
 
+def load_sim_item(path: str, r: redis.Redis, top_n: int = settings.sim_top_n) -> int:
+    """sim:item:{product} from a CSV product_id,neighbour_id,sim (header line). Returns products loaded."""
+    import csv
+    lists: dict[int, dict[str, float]] = defaultdict(dict)
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            lists[int(row["product_id"])][row["neighbour_id"]] = float(row["sim"])
+    pipe = r.pipeline(transaction=False)
+    for n, (pid, nb) in enumerate(lists.items(), 1):
+        top = dict(sorted(nb.items(), key=lambda kv: kv[1], reverse=True)[:top_n])
+        pipe.zadd(rk.sim_item(pid), top)
+        if n % 5000 == 0:
+            pipe.execute()
+    pipe.execute()
+    return len(lists)
+
+
 def candidate_lists(targets: list, r: redis.Redis, repo: RedisRepository, loop, kmax: int) -> list[dict]:
-    """The top-kmax lists of every method for each target, from the current Redis state."""
+    """The top-kmax lists of every method for each target, from the current Redis state.
+
+    Every method sees the same information: the state left by the previous
+    micro-batches. "The user's last product" is therefore the newest one in
+    user:recent, not the event just before the target if that event is in the
+    same micro-batch (it has not been processed yet).
+    """
     pipe = r.pipeline(transaction=False)
     pipe.zrevrange(rk.TREND_GLOBAL, 0, kmax - 1)
     for t in targets:
         pipe.zrevrange(rk.rec_rt(t.user_id), 0, kmax - 1)
-        pipe.zrevrange(rk.sim_cooc(t.last_product), 0, kmax - 1)
-        pipe.hget(product_key(t.last_product), "category_id")
+        pipe.zrevrange(rk.user_recent(t.user_id), 0, 0)
     res = pipe.execute()
     glob = [int(x) for x in res[0]]
-    cats = {int(c) for c in res[3::3] if c}
+    last = [rk.decode_recent(m[0])[0] if m else None for m in res[2::2]]
+
     pipe = r.pipeline(transaction=False)
-    cat_list = sorted(cats)
+    for p in last:
+        if p is not None:
+            pipe.zrevrange(rk.sim_cooc(p), 0, kmax - 1)
+            pipe.hget(product_key(p), "category_id")
+    flat = iter(pipe.execute())
+    cooc_of, cat_of = [], []
+    for p in last:
+        if p is None:
+            cooc_of.append([])
+            cat_of.append(None)
+        else:
+            cooc_of.append([int(x) for x in next(flat)])
+            cat_of.append(next(flat))
+    cat_list = sorted({int(c) for c in cat_of if c})
+    pipe = r.pipeline(transaction=False)
     for c in cat_list:
         pipe.zrevrange(rk.trend_cat(c), 0, kmax - 1)
     trend_cat = {c: [int(x) for x in lst] for c, lst in zip(cat_list, pipe.execute())}
@@ -217,13 +260,10 @@ def candidate_lists(targets: list, r: redis.Redis, repo: RedisRepository, loop, 
 
     out = []
     for n, t in enumerate(targets):
-        rec_rt = [int(x) for x in res[1 + 3 * n]]
-        cooc = [int(x) for x in res[2 + 3 * n]]
-        cat = res[3 + 3 * n]
-        tc = list(trend_cat.get(int(cat), [])) if cat else []
+        tc = list(trend_cat.get(int(cat_of[n]), [])) if cat_of[n] else []
         tc += [p for p in glob if p not in tc]
-        out.append({"trending": glob, "trending_cat": tc[:kmax], "cooc_last": cooc,
-                    "rec_rt": rec_rt, "api": api[t.user_id]})
+        out.append({"trending": glob, "trending_cat": tc[:kmax], "cooc_last": cooc_of[n],
+                    "rec_rt": [int(x) for x in res[1 + 2 * n]], "api": api[t.user_id]})
     return out
 
 
@@ -234,6 +274,9 @@ def run(args, r=None, ar=None) -> dict:
         raise SystemExit(f"Redis {args.redis_host}:{args.redis_port} is not empty: use a dedicated "
                          "instance, or --flush to empty it")
     r.flushdb()
+    if getattr(args, "sim_item", None):
+        stats_sim = load_sim_item(args.sim_item, r)
+        log.info("sim:item loaded: %s products", f"{stats_sim:,}")
     ar = ar or aioredis.Redis(host=args.redis_host, port=args.redis_port, decode_responses=True)
     repo = RedisRepository(ar, alpha=0.5)
     loop = asyncio.new_event_loop()
@@ -277,11 +320,15 @@ def run(args, r=None, ar=None) -> dict:
         seen[key] = row.epoch
         stats["events"] += 1
 
+        # Warm-up micro-batches can be longer: nothing is measured there, and fewer,
+        # larger batches merge the trending and co-occurrence writes (much faster).
+        size = (args.batch_seconds if row.epoch >= warm_epoch
+                else getattr(args, "warmup_batch_seconds", args.batch_seconds))
         if batch_end is None:
-            batch_end = (row.epoch // args.batch_seconds + 1) * args.batch_seconds
+            batch_end = (row.epoch // size + 1) * size
         if row.epoch >= batch_end:
             flush_batch()
-            batch_end = (row.epoch // args.batch_seconds + 1) * args.batch_seconds
+            batch_end = (row.epoch // size + 1) * size
             if len(seen) > 2_000_000:
                 seen = {k: t for k, t in seen.items() if t >= row.epoch - DEDUP_SECONDS}
 
@@ -290,7 +337,6 @@ def run(args, r=None, ar=None) -> dict:
         if (row.epoch >= warm_epoch and prev is not None and row.epoch - prev[1] <= rk.DAY
                 and prev[0] != row.product_id and sampled(row.user_id, args.sample)):
             row.target = True
-            row.last_product = prev[0]
             row.unseen = row.product_id not in recent.get(row.user_id, [])
         last[row.user_id] = (row.product_id, row.epoch)
         hist = recent.setdefault(row.user_id, [])
@@ -308,8 +354,12 @@ def run(args, r=None, ar=None) -> dict:
     stats["seconds"] = round(time.time() - started, 1)
     return {
         "config": {"file": args.file, "warmup_until": args.warmup_until, "end": args.end,
-                   "batch_seconds": args.batch_seconds, "half_life_seconds": args.half_life,
-                   "neighbours": args.neighbours, "sample": args.sample, "k": ks},
+                   "batch_seconds": args.batch_seconds,
+                   "warmup_batch_seconds": getattr(args, "warmup_batch_seconds", args.batch_seconds),
+                   "half_life_seconds": args.half_life,
+                   "neighbours": args.neighbours, "sample": args.sample, "k": ks,
+                   "rt_similarity": getattr(args, "rt_similarity", "cooc"),
+                   "sim_item": getattr(args, "sim_item", None)},
         "stats": stats,
         "results": results.to_dict(),
     }
@@ -330,9 +380,14 @@ def main() -> None:
     p.add_argument("--file", action="append", required=True, help="raw CSV (.csv or .csv.gz), repeatable")
     p.add_argument("--warmup-until", default=None, help="events before this time only build the state")
     p.add_argument("--end", default=None, help="stop at this event time (exclusive)")
-    p.add_argument("--batch-seconds", type=int, default=60, help="event time per micro-batch")
+    p.add_argument("--batch-seconds", type=int, default=30, help="event time per micro-batch")
+    p.add_argument("--warmup-batch-seconds", type=int, default=600,
+                   help="event time per micro-batch before --warmup-until (state only)")
     p.add_argument("--half-life", type=float, default=DEFAULT_HALF_LIFE_SECONDS, help="seconds")
     p.add_argument("--neighbours", type=int, default=rt_sink.RT_NEIGHBOURS, help="K of sim:cooc per event")
+    p.add_argument("--rt-similarity", choices=rt_sink.SIMILARITIES, default="cooc",
+                   help="neighbours used by rec:rt (item / hybrid need --sim-item)")
+    p.add_argument("--sim-item", default=None, help="CSV product_id,neighbour_id,sim loaded as sim:item")
     p.add_argument("--sample", type=float, default=1.0, help="fraction of users evaluated (all events are applied)")
     p.add_argument("--k", type=int, action="append", default=None, help="cut-offs (default 10 and 20)")
     p.add_argument("--redis-host", default="localhost")
