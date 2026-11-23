@@ -7,7 +7,9 @@ Two streaming queries share one parsed source (`main.py`):
 | Query | Steps | Redis keys | Week |
 |---|---|---|---|
 | `events` | parse → validate → watermark + dedup → `foreachBatch` | `user:recent`, `user:bought` (`sinks/user_state.py`) | 3 |
+| | | `rt:prod:*` product attributes (`sinks/products.py`) | 5 |
 | | | `sim:cooc` (`sinks/cooc.py`) | 4 |
+| | | `rec:rt`, after `sim:cooc` so it uses the fresh similarities (`sinks/realtime.py`) | 5 |
 | `trending` | parse → validate → watermark → 1 h window sliding every 5 min, summed event weights, output mode `update` | `trend:cat`, `trend:global` (`sinks/trending.py`) | 4 |
 
 Redis writes run on the executors (`foreachPartition`); the driver only
@@ -22,6 +24,8 @@ coordinates. Each query has its own checkpoint under `CHECKPOINT_LOCATION`.
 | `sinks/user_state.py` | `user:recent`, `user:bought` |
 | `sinks/cooc.py` | Session co-occurrence counts and `sim:cooc` |
 | `sinks/trending.py` | Per-window totals and publication of the current hour to `trend:*` |
+| `sinks/realtime.py` | `rec:rt`: score propagation through `sim:cooc` with time decay |
+| `sinks/products.py` | `rt:prod:*`: category, brand, price of each product (read by the API) |
 | `redis_conn.py` | One Redis client per Python worker |
 | `tests/` | Unit tests (fakeredis) and an end-to-end test of both queries |
 
@@ -69,6 +73,7 @@ older than the watermark are dropped:
 | `user:bought:{user_id}` | ZSET | product_id → latest purchase epoch (test with `ZSCORE`) | 30 days |
 | `sim:cooc:{product_id}` | ZSET | top 50 product_id → co-occurrence similarity in [0, 1] | 7 days |
 | `trend:cat:{category_id}`, `trend:global` | ZSET | top 100 product_id → weighted count in the last hour (view 1, cart 3, purchase 5) | 1 h |
+| `rec:rt:{user_id}` | ZSET | top 100 product_id → real-time score, decayed to the user's newest event | 6 h |
 
 `user:recent` and `user:bought` are ZSETs as in contract 1.1.0 (branch
 `hien/contract-redis-zset`, not merged into `master` yet).
@@ -79,19 +84,29 @@ product *j* already in it; a product viewed again while still in the window
 only moves to the front. Similarity = `cooc(i, j) / sqrt(cnt(i) · cnt(j))`
 (`common.scoring.cooc_similarity`), clipped at 1.
 
+**`rec:rt`.** For an event of type *e* on product *i*:
+`rt[j] += w_e · sim(i, j) · exp(−λ·Δt)` for the top 20 neighbours *j* in
+`sim:cooc:{i}`, half-life 30 minutes (`common.scoring.propagate`, `time_decay`).
+Stored scores are decayed to the user's newest event (`rt:rect:{user_id}`); a newer
+event first multiplies them by `exp(−λ·Δt)`. All scores of a user decay by the same
+factor, so the ranking does not depend on the reading time and the API needs no
+decay (it min-max normalises before merging).
+
 **`trend:*`.** The current hour is the sliding window that ends at the first
 5-minute boundary after the newest event time. When that window moves on,
 every category seen in it is republished.
 
 Internal keys (Pair 2 only, `rt:` prefix): `rt:sess:*`, `rt:cooc:*`,
-`rt:trend:*`, `rt:meta:stream`, `rt:meta:last_batch:*`.
+`rt:trend:*`, `rt:prod:*` (HASH category_id, category_code, brand, price; TTL 30 days),
+`rt:rect:*`, `rt:meta:stream`, `rt:meta:last_batch:*`.
 
 ## Delivery guarantees
 
 - `user:*` and `trend:*` are written with absolute values (ZADD of a stable
   member, or the full window total), so a replayed micro-batch changes nothing.
-- The co-occurrence counters use HINCRBY. A micro-batch that was already
+- The co-occurrence counters (HINCRBY) and `rec:rt` (read, decay, rewrite) are not
+  idempotent. A micro-batch that was already
   committed is skipped (`rt:meta:last_batch:{query_id}`); only a crash in the
-  middle of a batch can count some pairs twice.
+  middle of a batch can count some events twice.
 - The trending query has no de-duplication: Spark does not chain two stateful
   operators in update mode. Exact duplicate events add a little weight.

@@ -127,3 +127,56 @@ def test_trending_trim_keeps_top(r):
     assert r.zrange(trending.window_cat_key(1, 60), 0, -1) == ["7", "8", "9"]
     trending.publish(60, {1}, r, top_n=2)
     assert r.zrevrange(rk.trend_cat(1), 0, -1) == ["9", "8"]
+
+
+# ---- rec:rt (week 5) ---------------------------------------------------------
+
+from common.scoring import time_decay  # noqa: E402
+from streaming.sinks import products, realtime  # noqa: E402
+
+HL = 1800  # 30 min half-life
+
+
+def test_realtime_propagates_weighted_similarity(r):
+    r.zadd(rk.sim_cooc(1), {"2": 0.5, "3": 0.25})
+    realtime.update_realtime([Ev(7, 1, "cart", 1000, "s")], r, half_life=HL)
+    assert dict(r.zrevrange(rk.rec_rt(7), 0, -1, withscores=True)) == {"2": 1.5, "3": 0.75}   # w_cart = 3
+    assert r.get(realtime.ref_key(7)) == "1000"
+    assert 0 < r.ttl(rk.rec_rt(7)) <= rk.TTL["rec:rt"]
+
+
+def test_realtime_decays_old_scores_before_adding(r):
+    r.zadd(rk.sim_cooc(1), {"2": 1.0})
+    r.zadd(rk.sim_cooc(5), {"6": 1.0})
+    realtime.update_realtime([Ev(7, 1, "view", 0, "s")], r, half_life=HL)
+    # 30 minutes later (one half-life), in a new micro-batch
+    realtime.update_realtime([Ev(7, 5, "view", HL, "s")], r, half_life=HL)
+    scores = dict(r.zrange(rk.rec_rt(7), 0, -1, withscores=True))
+    assert scores["2"] == pytest.approx(0.5) and scores["6"] == pytest.approx(1.0)
+    assert r.get(realtime.ref_key(7)) == str(HL)
+
+
+def test_realtime_late_event_and_same_batch_order(r):
+    r.zadd(rk.sim_cooc(1), {"2": 1.0})
+    # two events of one user in one batch, given out of order: sorted by time
+    realtime.update_realtime([Ev(7, 1, "view", HL, "s"), Ev(7, 1, "view", 0, "s")], r, half_life=HL)
+    assert r.zscore(rk.rec_rt(7), "2") == pytest.approx(1.0 * time_decay(HL, HL) + 1.0)
+    # a late event (older than the reference) adds a decayed increment
+    realtime.update_realtime([Ev(7, 1, "purchase", 0, "s")], r, half_life=HL)
+    assert r.zscore(rk.rec_rt(7), "2") == pytest.approx(1.5 + 5 * 0.5)
+
+
+def test_realtime_top_n_and_no_neighbours(r):
+    r.zadd(rk.sim_cooc(1), {str(j): j / 10 for j in range(2, 12)})
+    realtime.update_realtime([Ev(7, 1, "view", 0, "s"), Ev(8, 99, "view", 0, "s")], r, top_n=3)
+    assert r.zrevrange(rk.rec_rt(7), 0, -1) == ["11", "10", "9"]
+    assert not r.exists(rk.rec_rt(8))                    # product without sim:cooc
+
+
+Pr = namedtuple("Pr", "product_id category_id category_code brand price")
+
+
+def test_products_keep_latest_attributes(r):
+    products.write_products([Pr(1, 10, None, "apple", 999.0), Pr(1, 10, "electronics.smartphone", "apple", 949.0)], r)
+    assert r.hgetall(products.product_key(1)) == {"category_id": "10", "category_code": "electronics.smartphone",
+                                                  "brand": "apple", "price": "949.0"}
