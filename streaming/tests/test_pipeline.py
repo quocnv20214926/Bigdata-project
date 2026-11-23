@@ -141,6 +141,13 @@ def test_pipeline_end_to_end(spark, r, tmp_path):
     assert r.zrange(rk.trend_cat(20), 0, -1) == ["200"]
     assert 0 < r.ttl(rk.trend_cat(10)) <= rk.TTL["trend"]
 
+    # week 5: product attributes and rec:rt (propagated through sim:cooc, decayed)
+    assert r.hget("rt:prod:100", "category_id") == "10"
+    rt1 = dict(r.zrange(rk.rec_rt(1), 0, -1, withscores=True))
+    assert set(rt1) == {"100", "101", "102"} and all(v > 0 for v in rt1.values())
+    assert r.get("rt:rect:1") == str(1569924180)                 # 10:03, newest event of user 1
+    assert r.exists(rk.rec_rt(2)) and not r.exists(rk.rec_rt(3))  # 200 has no neighbours
+
     # Restart with the same checkpoints and one new file: only the new event is processed.
     (inp / "part-1.json").write_text(ev("2019-10-01T10:07:00Z", "view", 103, 1, "a") + "\n")
     run(spark, inp, ckpt)
