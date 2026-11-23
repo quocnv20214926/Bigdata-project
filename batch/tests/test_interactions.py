@@ -104,3 +104,28 @@ def test_als_recommends_within_community(spark):
         base = 100 if user <= 20 else 200
         in_community = sum(base <= p < base + 5 for _, p in mine)
         assert in_community >= 3
+
+
+def test_numpy_recommend_matches_spark(spark):
+    inter = two_communities(spark)
+    model = als.train(inter, als.ALSParams(rank=4, reg_param=0.01, max_iter=10))
+    users = spark.createDataFrame([(u,) for u in range(1, 41)] + [(999,)], ["user_id"])
+    ours = {(r.user_id, r.rank): (r.product_id, r.score) for r in als.recommend(model, users, k=5, block_size=7).collect()}
+    spark_recs = {(r.user_id, r.rank): (r.product_id, r.score) for r in als.recommend_builtin(model, users, k=5).collect()}
+
+    assert ours.keys() == spark_recs.keys()                     # same users, 5 ranks each, 999 dropped
+    for key, (product, score) in ours.items():
+        assert score == pytest.approx(spark_recs[key][1], abs=1e-5)
+    for user in range(1, 41):                                   # same products (order only differs on ties)
+        assert {ours[user, r][0] for r in range(1, 6)} == {spark_recs[user, r][0] for r in range(1, 6)}
+
+
+def test_block_top_k_order_and_ties():
+    import numpy as np
+
+    items = np.array([[1.0], [2.0], [2.0], [0.5]], dtype=np.float32)
+    item_ids = np.array([40, 30, 20, 10])
+    out = als.block_top_k(np.array([7, 8]), np.array([[1.0], [-1.0]], dtype=np.float32), item_ids, items, k=3)
+    assert out[out.user_id == 7][["product_id", "rank"]].values.tolist() == [[20, 1], [30, 2], [40, 3]]   # tie: smaller id
+    assert out[out.user_id == 8]["product_id"].tolist() == [10, 40, 20]
+    assert len(als.block_top_k(np.array([7]), np.array([[1.0]], dtype=np.float32), item_ids, items, k=9)) == 4

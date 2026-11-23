@@ -1,0 +1,202 @@
+{
+  "check": {
+    "step": "check",
+    "run_id": "20261112T044512",
+    "as_of": "2019-11-16",
+    "events": 74971956,
+    "users": 4205076,
+    "first_day": "2019-10-01",
+    "last_day": "2019-11-15",
+    "window": [
+      null,
+      "2019-11-16"
+    ],
+    "seconds": 7.9
+  },
+  "popularity": {
+    "step": "popularity",
+    "run_id": "20261112T044512",
+    "as_of": "2019-11-16",
+    "products": 191909,
+    "categories": 659,
+    "pop_cat_rows": 43482,
+    "top_n": 100,
+    "seconds": 12.3
+  },
+  "train": {
+    "step": "train",
+    "run_id": "20261112T044512",
+    "as_of": "2019-11-16",
+    "als_matrix": {
+      "pairs": 38195148,
+      "users": 2890519,
+      "products": 155423,
+      "density": 8.502e-05
+    },
+    "als_params": {
+      "rank": 128,
+      "reg_param": 0.1,
+      "alpha": 5.0,
+      "max_iter": 5,
+      "seed": 42,
+      "checkpoint_interval": 2,
+      "blocks": 10
+    },
+    "train_seconds": 697.5,
+    "seconds": 770.2
+  },
+  "recommend": {
+    "step": "recommend",
+    "run_id": "20261112T044512",
+    "as_of": "2019-11-16",
+    "als_users": 2890519,
+    "user_limit": 1083864,
+    "users": 1083864,
+    "rows": 54193200,
+    "top_n": 50,
+    "oldest_last_event": "2019-11-09 20:59:56",
+    "estimated_mb": 860.0,
+    "seconds": 218.9
+  },
+  "sim": {
+    "step": "sim",
+    "run_id": "20261112T044512",
+    "as_of": "2019-11-16",
+    "source": "item_knn",
+    "products_in_matrix": 155423,
+    "products": 148414,
+    "rows": 5408264,
+    "mean_sim": 0.0724,
+    "seconds": 168.1
+  },
+  "load": {
+    "step": "load",
+    "run_id": "20261112T044512",
+    "as_of": "2019-11-16",
+    "estimated_bytes": {
+      "pop": 709966,
+      "sim:item": 92891420,
+      "rec:batch": 901774848
+    },
+    "families": {
+      "pop:global": {
+        "keys": 1,
+        "members": 100
+      },
+      "pop:cat:": {
+        "keys": 659,
+        "members": 43482,
+        "stale_deleted": 0
+      },
+      "sim:item:": {
+        "keys": 148414,
+        "members": 5408264,
+        "stale_deleted": 0
+      },
+      "rec:batch:": {
+        "keys": 1083864,
+        "members": 54193200,
+        "stale_deleted": 0
+      }
+    },
+    "last_run": "2026-11-12T05:09:54Z",
+    "seconds": 96.0
+  },
+  "validate": {
+    "step": "validate",
+    "run_id": "20261112T044512",
+    "as_of": "2019-11-16",
+    "families": {
+      "pop:global": {
+        "keys": 1,
+        "sampled_mean_members": 100.0,
+        "estimated_mb": 0.0,
+        "sample_key": "pop:global"
+      },
+      "pop:cat:": {
+        "keys": 659,
+        "sampled_mean_members": 66.1,
+        "estimated_mb": 0.4,
+        "sample_key": "pop:cat:2106075695351333719"
+      },
+      "sim:item:": {
+        "keys": 148414,
+        "sampled_mean_members": 36.0,
+        "estimated_mb": 75.3,
+        "sample_key": "sim:item:31501206"
+      },
+      "rec:batch:": {
+        "keys": 1083864,
+        "sampled_mean_members": 50.0,
+        "estimated_mb": 724.3,
+        "sample_key": "rec:batch:546782635"
+      }
+    },
+    "last_run": "2026-11-12T05:09:54Z",
+    "used_memory_mb": 943.1,
+    "maxmemory_mb": 2048.0,
+    "dbsize": 1232939,
+    "sample_rec_batch": {
+      "key": "rec:batch:546782635",
+      "top5": [
+        [
+          "5300032",
+          0.1073
+        ],
+        [
+          "5300453",
+          0.104
+        ],
+        [
+          "5300977",
+          0.0912
+        ],
+        [
+          "5300763",
+          0.0911
+        ],
+        [
+          "5300510",
+          0.0887
+        ]
+      ]
+    },
+    "seconds": 4.7
+  },
+  "cleanup": {
+    "step": "cleanup",
+    "run_id": "20261112T044512",
+    "as_of": "2019-11-16",
+    "kept": [
+      "20261027T191004",
+      "20261112T044512"
+    ],
+    "deleted": [
+      "20261026T020000"
+    ],
+    "seconds": 0.6
+  },
+  "recommend_week05_setting": {
+    "step": "recommend",
+    "run_id": "20261112T044512",
+    "as_of": "2019-11-16",
+    "als_users": 2890519,
+    "user_limit": 566441,
+    "users": 566441,
+    "rows": 56644100,
+    "top_n": 100,
+    "oldest_last_event": "2019-11-13 23:12:51",
+    "estimated_mb": 860.0,
+    "seconds": 180.2
+  },
+  "settings": {
+    "iter": 5,
+    "als_blocks": 10,
+    "kryo": false,
+    "machine": {
+      "ncpu": 10,
+      "memory_gb": 32,
+      "cpu": "Apple M1 Max"
+    }
+  }
+}

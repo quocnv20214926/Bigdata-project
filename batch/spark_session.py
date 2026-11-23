@@ -31,6 +31,10 @@ def get_spark(app_name: str, master: str | None = None, driver_memory: str | Non
         # the default 30 min lets ALS iterations pile up tens of GB on disk.
         .config("spark.cleaner.periodicGC.interval", "1min")
     )
+    # Extra settings for experiments, e.g. SPARK_EXTRA_CONF="spark.serializer=org.apache.spark.serializer.KryoSerializer"
+    for item in filter(None, os.getenv("SPARK_EXTRA_CONF", "").split(",")):
+        key, _, value = item.partition("=")
+        builder = builder.config(key.strip(), value.strip())
     if os.getenv("SPARK_IVY_DIR"):
         builder = builder.config("spark.jars.ivy", os.environ["SPARK_IVY_DIR"])
     if s3:

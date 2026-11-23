@@ -1,0 +1,123 @@
+{
+  "protocol": {
+    "fit": [
+      "2019-10-01",
+      "2019-11-08"
+    ],
+    "validation": [
+      "2019-11-09",
+      "2019-11-15"
+    ],
+    "truth_events": [
+      "view",
+      "cart",
+      "purchase"
+    ],
+    "eval_users_requested": 100000,
+    "filter": {
+      "min_users_per_product": 5,
+      "min_products_per_user": 2
+    },
+    "ks": [
+      10,
+      20
+    ],
+    "metric": "ndcg@10",
+    "search": "grid"
+  },
+  "grid": {
+    "alpha": [
+      5.0
+    ],
+    "reg_param": [
+      0.1
+    ],
+    "rank": [
+      128
+    ]
+  },
+  "start": {
+    "rank": 128,
+    "reg_param": 0.1,
+    "alpha": 5.0,
+    "max_iter": 5,
+    "seed": 42,
+    "checkpoint_interval": 1,
+    "blocks": 10
+  },
+  "data": {
+    "interactions": {
+      "pairs": 30400288,
+      "users": 3636150,
+      "products": 178195,
+      "density": 4.692e-05
+    },
+    "als_matrix": {
+      "pairs": 29152789,
+      "users": 2465378,
+      "products": 140077,
+      "density": 8.442e-05
+    },
+    "ground_truth": {
+      "users": 100000,
+      "pairs": 940118
+    }
+  },
+  "trials": [
+    {
+      "params": {
+        "rank": 128,
+        "reg_param": 0.1,
+        "alpha": 5.0,
+        "max_iter": 5,
+        "seed": 42,
+        "checkpoint_interval": 1,
+        "blocks": 10
+      },
+      "metrics": {
+        "users": 100000,
+        "precision@10": 0.066806,
+        "recall@10": 0.130964,
+        "hit_rate@10": 0.35801,
+        "ndcg@10": 0.129774,
+        "precision@20": 0.046956,
+        "recall@20": 0.167472,
+        "hit_rate@20": 0.41248,
+        "ndcg@20": 0.136333,
+        "coverage@10": 0.014235
+      },
+      "seconds": {
+        "train": 558.6,
+        "total": 587.9
+      }
+    }
+  ],
+  "seconds": {
+    "prepare": 54.1,
+    "total": 642.0
+  },
+  "best": {
+    "params": {
+      "rank": 128,
+      "reg_param": 0.1,
+      "alpha": 5.0,
+      "max_iter": 5,
+      "seed": 42,
+      "checkpoint_interval": 1,
+      "blocks": 10
+    },
+    "metrics": {
+      "users": 100000,
+      "precision@10": 0.066806,
+      "recall@10": 0.130964,
+      "hit_rate@10": 0.35801,
+      "ndcg@10": 0.129774,
+      "precision@20": 0.046956,
+      "recall@20": 0.167472,
+      "hit_rate@20": 0.41248,
+      "ndcg@20": 0.136333,
+      "coverage@10": 0.014235
+    }
+  },
+  "input": "s3a://lake/clean/events/"
+}
